@@ -1,4 +1,4 @@
-﻿import os
+import os
 from pathlib import Path
 
 # Paths
@@ -19,14 +19,16 @@ POPULAR_MARKETS = [
     {"name": "KALYAN", "slug": "kalyan", "open_time": "04:35 PM", "close_time": "06:35 PM"},
     {"name": "MILAN DAY", "slug": "milan-day", "open_time": "03:00 PM", "close_time": "05:00 PM"},
     {"name": "MILAN NIGHT", "slug": "milan-night", "open_time": "09:10 PM", "close_time": "11:10 PM"},
-    {"name": "RAJDHANI NIGHT", "slug": "rajdhani-night", "open_time": "09:35 PM", "close_time": "11:45 PM"},
     {"name": "MAIN BAZAR", "slug": "main-bazar", "open_time": "10:00 PM", "close_time": "12:10 AM"},
     {"name": "TIME BAZAR", "slug": "time-bazar", "open_time": "01:00 PM", "close_time": "02:00 PM"},
     {"name": "SRIDEVI", "slug": "sridevi", "open_time": "11:35 AM", "close_time": "12:35 PM"},
     {"name": "SRIDEVI NIGHT", "slug": "sridevi-night", "open_time": "07:15 PM", "close_time": "08:15 PM"},
     {"name": "KALYAN NIGHT", "slug": "kalyan-night", "open_time": "09:40 PM", "close_time": "11:40 PM"},
+    {"name": "MADHUR MORNING", "slug": "madhur-morning", "open_time": "11:30 AM", "close_time": "12:30 PM"},
     {"name": "MADHUR DAY", "slug": "madhur-day", "open_time": "01:30 PM", "close_time": "02:30 PM"},
     {"name": "MADHUR NIGHT", "slug": "madhur-night", "open_time": "08:30 PM", "close_time": "10:30 PM"},
+    {"name": "RAJDHANI DAY", "slug": "rajdhani-day", "open_time": "03:00 PM", "close_time": "05:00 PM"},
+    {"name": "RAJDHANI NIGHT", "slug": "rajdhani-night", "open_time": "09:35 PM", "close_time": "11:45 PM"},
 ]
 
 # Cut Digits Map (Opposite Number in Matka Rules)
