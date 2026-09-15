@@ -29,6 +29,10 @@ TRIANGLE_PALETTES = [
     {"stroke": "#00ff88", "fill": "rgba(0, 255, 136, 0.18)", "glow": "rgba(0, 255, 136, 0.6)"},
     {"stroke": "#bb86fc", "fill": "rgba(187, 134, 252, 0.18)", "glow": "rgba(187, 134, 252, 0.6)"},
     {"stroke": "#ff7700", "fill": "rgba(255, 119, 0, 0.18)", "glow": "rgba(255, 119, 0, 0.6)"},
+    {"stroke": "#ff3366", "fill": "rgba(255, 51, 102, 0.18)", "glow": "rgba(255, 51, 102, 0.6)"},
+    {"stroke": "#00e5ff", "fill": "rgba(0, 229, 255, 0.18)", "glow": "rgba(0, 229, 255, 0.6)"},
+    {"stroke": "#76ff03", "fill": "rgba(118, 255, 3, 0.18)", "glow": "rgba(118, 255, 3, 0.6)"},
+    {"stroke": "#e040fb", "fill": "rgba(224, 64, 251, 0.18)", "glow": "rgba(224, 64, 251, 0.6)"},
 ]
 
 class FamilyTriangleEngine:

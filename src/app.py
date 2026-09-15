@@ -814,9 +814,9 @@ with tab_triangle:
         tri_mode = st.radio(
             "त्रिकोण पाहण्याची पद्धत (Triangle View Mode):",
             [
-                "🎯 टार्गेट फॅमिली त्रिकोण (Projected to Target '??')",
-                "🔺 चार्टमधील पूर्ण झालेले फॅमिली त्रिकोण (Completed Triangles)",
-                "✨ सर्व त्रिकोण एकत्र पाहा (Overlay All Triangles)"
+                "🎯 टार्गेट फॅमिली त्रिकोण — एक-एक पाहा (Single Target View)",
+                "✨ सर्व टार्गेट त्रिकोण एकत्र पाहा (Overlay All Target Triangles)",
+                "🔺 चार्टमधील पूर्ण झालेले जुने त्रिकोण (Completed Triangles)"
             ],
             index=0,
             horizontal=True,
@@ -837,7 +837,7 @@ with tab_triangle:
     proj_triangles = tri_data.get("projected", [])
 
     if tri_mode.startswith("🎯"):
-        # Projected Target Triangles
+        # Projected Target Triangles - Single View
         st.markdown(f"#### 🎯 टार्गेट `{target_day}` कडे पॉईंट करणारे फॅमिली त्रिकोण ({len(proj_triangles)} सापडले):")
         
         if proj_triangles:
@@ -889,6 +889,34 @@ with tab_triangle:
             """, unsafe_allow_html=True)
         else:
             st.info(f"ℹ️ चालू चार्टच्या शेवटच्या {tri_rows_cnt} ओळींमध्ये {target_day} साठी टार्गेट त्रिकोण सापडला नाही. ओळींची संख्या बदलून पाहा.")
+
+    elif tri_mode.startswith("✨"):
+        # Overlay All Target Triangles pointing only to target_day (e.g. Tuesday)
+        st.markdown(f"#### ✨ `{target_day}` कडे पॉईंट करणारे सर्व टार्गेट फॅमिली त्रिकोण एकत्र ({len(proj_triangles)} सापडले):")
+        if proj_triangles:
+            overlay_html = render_family_triangle_panel_html(
+                grid_snippet=tri_snip,
+                triangles=proj_triangles,
+                active_idx=None,
+                title=f"✨ {target_day} '??' ला पॉईंट करणारे सर्व {len(proj_triangles)} फॅमिली त्रिकोण (एकत्रित ओव्हरले — शेवटचे {tri_rows_cnt} आठवडे)"
+            )
+            st.markdown(overlay_html, unsafe_allow_html=True)
+
+            st.markdown(f"##### 📋 सर्व {len(proj_triangles)} टार्गेट त्रिकोणांची भविष्यवाणी:")
+            grid_cols = st.columns(min(len(proj_triangles), 3) if len(proj_triangles) > 0 else 1)
+            for i, t in enumerate(proj_triangles):
+                with grid_cols[i % len(grid_cols)]:
+                    pal = TRIANGLE_PALETTES[i % len(TRIANGLE_PALETTES)]
+                    fam_pills = "".join([f'<span class="family-pill" style="font-size:11px;padding:2px 6px;">{j}</span>' for j in t["predicted_family"][:4]])
+                    st.markdown(f"""
+                    <div style="background:#141126;border:1.5px solid {pal['stroke']};border-radius:10px;padding:10px;margin-bottom:10px;">
+                        <b style="color:{pal['stroke']};font-size:13px;">त्रिकोण #{i+1}: {t['type_title']}</b><br>
+                        <span style="font-size:12px;color:#ccc;">🔗 {t['summary']}</span><br>
+                        <div style="margin-top:5px;"><b style="color:#ffcc00;font-size:11px;">8-Family:</b> {fam_pills}...</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info(f"ℹ️ चालू चार्टच्या शेवटच्या {tri_rows_cnt} ओळींमध्ये {target_day} '??' कडे पॉईंट करणारे फॅमिली त्रिकोण सापडले नाहीत.")
 
     elif tri_mode.startswith("🔺"):
         # Completed Triangles
@@ -944,21 +972,6 @@ with tab_triangle:
         else:
             st.info(f"ℹ️ चालू चार्टच्या शेवटच्या {tri_rows_cnt} ओळींमध्ये पूर्ण झालेले त्रिकोण सापडले नाहीत.")
 
-    else:
-        # Overlay All Triangles
-        st.markdown(f"#### ✨ सर्व फॅमिली त्रिकोण एकत्र चार्टवर ({len(comp_triangles)} पूर्ण + {len(proj_triangles)} टार्गेट):")
-        all_tri_combined = comp_triangles + proj_triangles
-        if all_tri_combined:
-            overlay_html = render_family_triangle_panel_html(
-                grid_snippet=tri_snip,
-                triangles=all_tri_combined[:6],
-                active_idx=None,
-                title=f"✨ सर्व फॅमिली त्रिकोण एकत्रित ओव्हरले चार्ट (शेवटचे {tri_rows_cnt} आठवडे)"
-            )
-            st.markdown(overlay_html, unsafe_allow_html=True)
-        else:
-            st.info("ℹ️ कोणतेही त्रिकोण सापडले नाहीत.")
-
     # ── Summary Table of All Discovered Triangles ──
     st.markdown("---")
     with st.expander(f"📋 चालू चार्टमधील सर्व फॅमिली त्रिकोणांची यादी ({len(comp_triangles)} पूर्ण / {len(proj_triangles)} टार्गेट)", expanded=False):
@@ -1007,9 +1020,9 @@ with tab_seq_triangle:
         seq_mode = st.radio(
             "सीक्वेन्स पाहण्याची पद्धत (Sequence View Mode):",
             [
-                "🎯 टार्गेट फॅमिली सीक्वेन्स (Projected to Target '??')",
-                "⚡ पूर्ण झालेले फॅमिली सीक्वेन्स (Completed Sequences)",
-                "✨ सर्व सीक्वेन्स एकत्र पाहा (Overlay All)"
+                "🎯 टार्गेट फॅमिली सीक्वेन्स — एक-एक पाहा (Single Target View)",
+                "✨ सर्व टार्गेट सीक्वेन्स एकत्र पाहा (Overlay All Target Sequences)",
+                "⚡ चार्टमधील पूर्ण झालेले जुने सीक्वेन्स (Completed Sequences)"
             ],
             index=0,
             horizontal=True,
@@ -1091,6 +1104,34 @@ with tab_seq_triangle:
         else:
             st.info(f"ℹ️ चालू चार्टच्या शेवटच्या {seq_rows_cnt} ओळींमध्ये {target_day} साठी फॅमिली सीक्वेन्स सापडला नाही. ओळींची संख्या बदलून पाहा.")
 
+    elif seq_mode.startswith("✨"):
+        # Overlay All Target Sequences pointing only to target_day
+        st.markdown(f"#### ✨ `{target_day}` कडे जाणारे सर्व टार्गेट फॅमिली सीक्वेन्स एकत्र ({len(proj_seq_tri)} सापडले):")
+        if proj_seq_tri:
+            overlay_seq_html = render_family_sequence_triangle_panel_html(
+                grid_snippet=seq_snip,
+                triangles=proj_seq_tri,
+                active_idx=None,
+                title=f"✨ {target_day} '??' कडे जाणारे सर्व {len(proj_seq_tri)} सीक्वेन्स त्रिकोण (एकत्रित ओव्हरले — शेवटचे {seq_rows_cnt} आठवडे)"
+            )
+            st.markdown(overlay_seq_html, unsafe_allow_html=True)
+
+            st.markdown(f"##### 📋 सर्व {len(proj_seq_tri)} टार्गेट सीक्वेन्सची भविष्यवाणी:")
+            grid_s_cols = st.columns(min(len(proj_seq_tri), 3) if len(proj_seq_tri) > 0 else 1)
+            for i, t in enumerate(proj_seq_tri):
+                with grid_s_cols[i % len(grid_s_cols)]:
+                    pal = TRIANGLE_PALETTES[i % len(TRIANGLE_PALETTES)]
+                    st.markdown(f"""
+                    <div style="background:#141126;border:1.5px solid {pal['stroke']};border-radius:10px;padding:10px;margin-bottom:10px;">
+                        <b style="color:{pal['stroke']};font-size:13px;">सीक्वेन्स #{i+1}: {t['type_title']}</b><br>
+                        <span style="font-size:12px;color:#00ffcc;">🔗 {t['sequence_formula']}</span><br>
+                        <span style="font-size:11px;color:#aaa;">⏩ +१: {', '.join(t['fwd_family'][:4])}...</span><br>
+                        <span style="font-size:11px;color:#aaa;">⏪ -१: {', '.join(t['bwd_family'][:4])}...</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info(f"ℹ️ चालू चार्टच्या शेवटच्या {seq_rows_cnt} ओळींमध्ये {target_day} '??' कडे जाणारे फॅमिली सीक्वेन्स सापडले नाहीत.")
+
     elif seq_mode.startswith("⚡"):
         st.markdown(f"#### ⚡ चार्टमधील पूर्ण झालेले फॅमिली सीक्वेन्स त्रिकोण ({len(comp_seq_tri)} सापडले):")
         
@@ -1137,20 +1178,6 @@ with tab_seq_triangle:
             """, unsafe_allow_html=True)
         else:
             st.info(f"ℹ️ चालू चार्टच्या शेवटच्या {seq_rows_cnt} ओळींमध्ये पूर्ण झालेले सीक्वेन्स सापडले नाहीत.")
-
-    else:
-        st.markdown(f"#### ✨ सर्व फॅमिली सीक्वेन्स एकत्र चार्टवर ({len(comp_seq_tri)} पूर्ण + {len(proj_seq_tri)} टार्गेट):")
-        all_seq_combined = comp_seq_tri + proj_seq_tri
-        if all_seq_combined:
-            overlay_seq_html = render_family_sequence_triangle_panel_html(
-                grid_snippet=seq_snip,
-                triangles=all_seq_combined[:6],
-                active_idx=None,
-                title=f"✨ सर्व फॅमिली सीक्वेन्स एकत्रित ओव्हरले (शेवटचे {seq_rows_cnt} आठवडे)"
-            )
-            st.markdown(overlay_seq_html, unsafe_allow_html=True)
-        else:
-            st.info("ℹ️ कोणतेही सीक्वेन्स सापडले नाहीत.")
 
     # Summary table
     st.markdown("---")
