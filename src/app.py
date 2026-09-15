@@ -10,7 +10,7 @@ from src.engine.tricks_engine import TrickAnalyzer, TRICKS
 from src.engine.cross_line_engine import CrossLineEngine, RED_JODIS, are_family
 from src.engine.cross_line_visualizer import render_cross_line_panel_html
 from src.engine.date_figure_engine import DateFigureEngine, USER_DATE_MAP
-from src.engine.family_triangle_engine import FamilyTriangleEngine, render_family_triangle_panel_html
+from src.engine.family_triangle_engine import FamilyTriangleEngine, render_family_triangle_panel_html, TRIANGLE_PALETTES
 from src.engine.family_sequence_triangle_engine import FamilySequenceTriangleEngine, render_family_sequence_triangle_panel_html, find_family_pair_sequence
 from src.scraper.ingest import run_ingestion
 from src.config import POPULAR_MARKETS, get_jodi_family, CUT_NUMBERS

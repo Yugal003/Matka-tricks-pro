@@ -155,7 +155,7 @@ class TestFamilySequenceTriangleEngine(unittest.TestCase):
         from src.engine.family_sequence_triangle_engine import FamilySequenceTriangleEngine, render_family_sequence_triangle_panel_html
         eng = FamilySequenceTriangleEngine()
         snip = eng.get_snippet('KALYAN', rows_count=4)
-        res = eng.find_all_sequence_triangles(snip, target_day='Mon')
+        res = eng.find_all_sequence_triangles(snip, target_day='Tue')
         self.assertIn('completed', res)
         self.assertIn('projected', res)
         all_seq = res['completed'] + res['projected']
@@ -163,5 +163,21 @@ class TestFamilySequenceTriangleEngine(unittest.TestCase):
         self.assertIn('<svg', html)
         self.assertIn('<table', html)
 
+        # Test overlay all mode (active_idx=None)
+        overlay_html = render_family_sequence_triangle_panel_html(snip, res['projected'], active_idx=None)
+        self.assertIn('<svg', overlay_html)
+        self.assertIn('<polygon', overlay_html)
+
+    def test_triangle_palettes_import_and_usage(self):
+        """Verify TRIANGLE_PALETTES is importable and valid"""
+        from src.engine.family_triangle_engine import TRIANGLE_PALETTES
+        self.assertIsInstance(TRIANGLE_PALETTES, list)
+        self.assertGreater(len(TRIANGLE_PALETTES), 5)
+        for p in TRIANGLE_PALETTES:
+            self.assertIn('stroke', p)
+            self.assertIn('fill', p)
+            self.assertIn('glow', p)
+
 if __name__ == '__main__':
     unittest.main()
+
