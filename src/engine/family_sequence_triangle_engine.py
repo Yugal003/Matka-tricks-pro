@@ -256,69 +256,94 @@ def render_family_sequence_triangle_panel_html(
             c = n["c"]
             cx = DATE_W + c * CELL_W + CELL_W / 2
             cy = HEADER_H + r * ROW_H + ROW_H / 2
-            pts.append(f"{cx},{cy}")
+            pts.append((cx, cy))
 
         if len(pts) == 3:
-            pts_str = " ".join(pts)
+            pts_str = f"{pts[0][0]:.1f},{pts[0][1]:.1f} {pts[1][0]:.1f},{pts[1][1]:.1f} {pts[2][0]:.1f},{pts[2][1]:.1f}"
             svg_elements.append(
-                f'<polygon points="{pts_str}" fill="{pal["fill"]}" stroke="{pal["stroke"]}" stroke-width="2.5" stroke-dasharray="6,3" filter="url(#seq-glow-{t_idx})" />'
+                f'<polygon points="{pts_str}" fill="{pal["fill"]}" stroke="{pal["stroke"]}" '
+                f'stroke-width="2.5" stroke-dasharray="6,3" style="filter:drop-shadow(0 0 6px {pal["glow"]});" />'
             )
-            step_labels = ["①", "②", "🎯"] if t["nodes"][2].get("is_target") else ["①", "②", "③"]
-            for s_idx, n in enumerate(t["nodes"]):
-                cx = DATE_W + n["c"] * CELL_W + CELL_W / 2
-                cy = HEADER_H + n["r"] * ROW_H + ROW_H / 2
-                marker_col = "#ff007f" if n.get("is_target") else "#00d2ff"
-                lbl = step_labels[s_idx]
+            for i in range(3):
+                p1, p2 = pts[i], pts[(i+1)%3]
                 svg_elements.append(
-                    f'<circle cx="{cx}" cy="{cy}" r="14" fill="#0b0b14" stroke="{marker_col}" stroke-width="2" /><text x="{cx}" y="{cy+4}" font-size="12" font-weight="bold" fill="{marker_col}" text-anchor="middle">{lbl}</text>'
+                    f'<line x1="{p1[0]:.1f}" y1="{p1[1]:.1f}" x2="{p2[0]:.1f}" y2="{p2[1]:.1f}" '
+                    f'stroke="{pal["stroke"]}" stroke-width="2.5" />'
                 )
 
-    table_rows = []
-    header_th = "<th style='width:95px;padding:6px;color:#888;font-size:12px;background:#151525;'>आठवडा</th>" + "".join([
-        f"<th style='width:70px;padding:6px;color:#00d2ff;font-size:13px;text-align:center;background:#151525;'>{DAY_MARATHI[d]}<br><span style='color:#666;font-size:10px;'>{d}</span></th>"
-        for d in DAY_ORDER
-    ])
-    table_rows.append(f"<tr style='border-bottom:1px solid #333;'>{header_th}</tr>")
+            # Draw step labels ①, ②, 🎯 if in single triangle view
+            if active_idx is not None:
+                step_labels = ["①", "②", "🎯"] if t["nodes"][2].get("is_target") else ["①", "②", "③"]
+                for s_idx, n in enumerate(t["nodes"]):
+                    cx = DATE_W + n["c"] * CELL_W + CELL_W / 2
+                    cy = HEADER_H + n["r"] * ROW_H + ROW_H / 2
+                    marker_col = "#ff007f" if n.get("is_target") else pal["stroke"]
+                    lbl = step_labels[s_idx]
+                    svg_elements.append(
+                        f'<circle cx="{cx}" cy="{cy}" r="13" fill="#0b0b14" stroke="{marker_col}" stroke-width="2" />'
+                        f'<text x="{cx}" y="{cy+4}" font-size="11" font-weight="bold" fill="{marker_col}" text-anchor="middle">{lbl}</text>'
+                    )
 
+    svg_overlay = f"""<svg style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;" 
+        width="{total_w}" height="{svg_h}" xmlns="http://www.w3.org/2000/svg">
+        {''.join(svg_elements)}
+    </svg>"""
+
+    # Table Header
+    thead = f"""<thead>
+        <tr style="background:#15152b;color:#ddd;font-size:12px;height:{HEADER_H}px;">
+            <th style="border:1px solid #444;width:{DATE_W}px;text-align:center;">Date Range</th>
+            {''.join([f'<th style="border:1px solid #444;width:{CELL_W}px;text-align:center;color:#00d2ff;">{DAY_MARATHI[d]}<br><span style="color:#888;font-size:10px;">{d}</span></th>' for d in DAY_ORDER])}
+        </tr>
+    </thead>"""
+
+    # Highlight map: (r, c) -> node info
+    high_map = {}
+    for t_idx, t in enumerate(render_triangles):
+        pal = TRIANGLE_PALETTES[(active_idx if active_idx is not None else t_idx) % len(TRIANGLE_PALETTES)]
+        for n in t["nodes"]:
+            high_map[(n["r"], n["c"])] = {**n, "palette": pal}
+
+    tbody_rows = ""
     for r_idx, w in enumerate(grid_snippet):
         dr = w.get("date_range", "")
-        short_dr = dr.split(" to ")[0] if " to " in dr else dr
-        tds = [f"<td style='padding:6px 8px;color:#aaa;font-size:11px;font-weight:bold;background:#111120;border-right:1px solid #222;'>{short_dr}</td>"]
-        
+        disp_dr = dr.replace(" to ", "<br>to<br>")
+        date_td = f'<td style="font-size:9.5px;padding:2px;border:1px solid #333;background:#131322;color:#aaa;text-align:center;width:{DATE_W}px;line-height:1.2;">{disp_dr}</td>'
+
+        day_tds = ""
         for c_idx, d in enumerate(DAY_ORDER):
             cell = w.get("days", {}).get(d, {})
-            j = cell.get("jodi", "")
-            if not j:
-                tds.append("<td style='padding:6px;text-align:center;color:#444;background:#0d0d18;'>--</td>")
-                continue
-            cell_style = "padding:6px;text-align:center;border:1px solid #1a1a2e;background:#0d0d18;"
-            jodi_html = f"<b style='color:#ffcc00;font-size:15px;'>{j}</b>"
-            tds.append(f"<td style='{cell_style}'>{jodi_html}</td>")
-            
-        table_rows.append(f"<tr>{''.join(tds)}</tr>")
+            jodi = cell.get("jodi", "")
 
-    svg_filters = "".join([
-        f'<filter id="seq-glow-{i}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="4" result="blur" /><feComposite in="SourceGraphic" in2="blur" operator="over" /></filter>'
-        for i in range(10)
-    ])
+            node_info = high_map.get((r_idx, c_idx))
+            if node_info:
+                pal = node_info.get("palette", TRIANGLE_PALETTES[0])
+                if node_info.get("is_target"):
+                    # Target node
+                    jodi_html = f'<div style="font-size:16px;font-weight:900;color:#fff;background:#ff007f;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;margin:auto;box-shadow:0 0 14px #ff007f;" title="टार्गेट सीक्वेन्स टोक">??</div>'
+                else:
+                    # Highlighted Vertex
+                    jodi_html = f'<div style="font-size:15px;font-weight:900;color:#fff;background:#181830;border:3px solid {pal["stroke"]};border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;margin:auto;box-shadow:0 0 10px {pal["glow"]};">{jodi or "??"}</div>'
+            else:
+                if not jodi:
+                    jodi_html = '<div style="font-size:13px;color:#444;">--</div>'
+                else:
+                    jodi_html = f'<div style="font-size:14px;color:#888;font-weight:600;">{jodi}</div>'
 
-    svg_els_str = "".join(svg_elements)
-    tbl_str = "".join(table_rows)
+            bg = "#1a1a2e" if r_idx % 2 == 0 else "#141424"
+            day_tds += f'<td style="border:1px solid #222;text-align:center;padding:1px;background:{bg};width:{CELL_W}px;height:{ROW_H}px;">{jodi_html}</td>'
 
-    html = f"""
-    <div style="background:#0b0b16;border:2px solid #00d2ff;border-radius:12px;padding:12px;margin-bottom:15px;overflow-x:auto;">
-        <div style="font-size:16px;font-weight:900;color:#00d2ff;margin-bottom:10px;">
-            {title}
-        </div>
-        <div style="position:relative;width:{total_w}px;margin:0 auto;">
-            <svg style="position:absolute;top:0;left:0;width:{total_w}px;height:{svg_h}px;pointer-events:none;z-index:10;">
-                <defs>{svg_filters}</defs>
-                {svg_els_str}
-            </svg>
-            <table style="border-collapse:collapse;width:{total_w}px;background:#0d0d1a;">
-                {tbl_str}
-            </table>
-        </div>
+        tbody_rows += f'<tr style="height:{ROW_H}px;">{date_td}{day_tds}</tr>'
+
+    return f"""
+<div style="background:#0a0a16;border:2px solid #00d2ff;border-radius:12px;padding:12px;margin-bottom:15px;overflow-x:auto;">
+    <div style="font-size:16px;font-weight:900;color:#00d2ff;margin-bottom:10px;">{title}</div>
+    <div style="position:relative;display:inline-block;min-width:100%;">
+        {svg_overlay}
+        <table style="width:{total_w}px;border-collapse:collapse;table-layout:fixed;position:relative;z-index:2;">
+            {thead}
+            <tbody>{tbody_rows}</tbody>
+        </table>
     </div>
-    """
-    return html
+</div>
+"""
