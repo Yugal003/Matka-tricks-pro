@@ -188,13 +188,15 @@ ALL_MARKETS = [m["name"] for m in POPULAR_MARKETS]
 # ── Sidebar ─────────────────────────────────────────────────
 st.sidebar.markdown("## ⚙️ कंट्रोल पॅनेल")
 
-if st.sidebar.button("🔄 डेटा अपडेट करा (Sync DpBoss)"):
-    with st.spinner("DpBoss वरून नवीन डेटा आणत आहे..."):
+if st.sidebar.button("🔄 नवीन डेटा सिंक करा (Sync Live DpBoss)", use_container_width=True):
+    with st.spinner("⚡ DpBoss वरून सर्व चार्ट्स व आजचे नवीन निकाल अपडेट करत आहे..."):
         try:
             run_ingestion()
-            st.sidebar.success("डेटा अपडेट झाला!")
+            st.cache_data.clear()
+            st.sidebar.success("✅ सर्व चार्ट्स व निकाल यशस्वीरित्या अपडेट झाले!")
+            st.rerun()
         except Exception as e:
-            st.sidebar.error(str(e))
+            st.sidebar.error(f"अपडेट करताना त्रुटी: {e}")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📋 Market निवडा (Scroll Bar)")

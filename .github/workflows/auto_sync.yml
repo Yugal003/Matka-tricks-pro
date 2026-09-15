@@ -1,0 +1,35 @@
+﻿name: Daily Matka Data Auto-Sync
+
+on:
+  schedule:
+    # Runs at 10:30 AM, 1:30 PM, 4:30 PM UTC (4:00 PM, 7:00 PM, 10:00 PM IST)
+    - cron: '30 10,13,16 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Ingestion Script
+        run: |
+          python -m src.scraper.ingest
+
+      - name: Commit and Push Updated Data
+        run: |
+          git config --global user.name 'Matka-Sync-Bot'
+          git config --global user.email 'bot@github.com'
+          git add data/
+          git diff --quiet && git diff --staged --quiet || (git commit -m  Auto-sync latest charts from DpBoss [skip ci] && git push)
