@@ -222,6 +222,12 @@ class CrossLineEngine:
                             if confidence > 99:
                                 confidence = 99.9
 
+                            # Compute exact snippet surrounding historical line
+                            all_hr = [h["row"] for h in hist_line] + [proj_hr]
+                            min_hr = max(0, min(all_hr) - 1)
+                            max_hr = min(len(grid), max(all_hr) + 2)
+                            hist_snip = grid[min_hr:max_hr]
+
                             all_matches.append({
                                 "market": market,
                                 "match_length": k,
@@ -233,6 +239,7 @@ class CrossLineEngine:
                                 "target_date_range": grid[target_row]["date_range"],
                                 "current_sequence": current_seq,
                                 "historical_line": hist_line,
+                                "hist_snippet": hist_snip,
                                 "predicted_jodi": proj_jodi,
                                 "predicted_family": proj_family,
                                 "hist_anchor_date": proj_dr,

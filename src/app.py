@@ -9,7 +9,6 @@ from src.storage.database import MatkaDatabase
 from src.engine.tricks_engine import TrickAnalyzer, TRICKS
 from src.engine.cross_line_engine import CrossLineEngine, RED_JODIS, are_family
 from src.engine.cross_line_visualizer import render_cross_line_panel_html
-from src.engine.patti_analyzer import PattiAnalyzerEngine, ALL_220_PATTIS
 from src.engine.date_figure_engine import DateFigureEngine, USER_DATE_MAP
 from src.engine.family_triangle_engine import FamilyTriangleEngine, render_family_triangle_panel_html
 from src.engine.family_sequence_triangle_engine import FamilySequenceTriangleEngine, render_family_sequence_triangle_panel_html, find_family_pair_sequence
@@ -224,10 +223,9 @@ st.markdown('<div class="main-title">🎯 मटका क्रॉस लाई
 st.markdown(f'<div class="sub-title">निवडलेला मार्केट: <b style="color:#ffcc00;font-size:15px;">{selected_market}</b> &nbsp;|&nbsp; टार्गेट: <b style="color:#00ffcc;font-size:15px;">{target_day}</b></div>', unsafe_allow_html=True)
 
 # ── Main Tabs ───────────────────────────────────────────────
-tab_cross, tab_all_tricks, tab_patti, tab_date, tab_triangle, tab_seq_triangle = st.tabs([
+tab_cross, tab_all_tricks, tab_date, tab_triangle, tab_seq_triangle = st.tabs([
     "📐 क्रॉस लाईन फॅमिली मॅचिंग ट्रिक (Cross Line / Line Dekho)",
     "📊 इतर सर्व 22 ट्रिक्स झोन (Tricks Zone Pass/Fail)",
-    "🎴 पत्ती / पाना सायकल व पॅटर्न विश्लेषक (Patti / Panna Analyzer)",
     "📅 तारीखेनुसार १००% फिक्स अंक ट्रिक (Date-Wise Fix Figures)",
     "🔺 चालू चार्ट फॅमिली त्रिकोण स्कीम (Family Triangle Scheme)",
     "⚡ चालू चार्ट फॅमिली सीक्वेन्स त्रिकोण (Sequence Triangle Scheme)",
@@ -334,12 +332,8 @@ with tab_cross:
 
                 # Generate Historical snippet for this combination
                 m_h_rows = [h["row"] for h in m["historical_line"]]
-                if m_h_rows:
-                    m_min_hr = max(0, min(m_h_rows) - 1)
-                    m_max_hr = min(len(full_grid), max(m_h_rows) + 3)
-                    m_hist_snip = full_grid[m_min_hr:m_max_hr]
-                else:
-                    m_hist_snip = []
+                # Get exact historical snippet for this combination
+                m_hist_snip = m.get("hist_snippet", [])
 
                 m_proj_info = {
                     "date_range": m["hist_anchor_date"],
@@ -424,13 +418,8 @@ with tab_cross:
                 proj_node=cur_proj_info
             )
             
-            hist_rows = [h["row"] for h in hist_line]
-            if hist_rows:
-                min_hr = max(0, min(hist_rows) - 1)
-                max_hr = min(len(full_grid), max(hist_rows) + 3)
-                hist_snippet = full_grid[min_hr:max_hr]
-            else:
-                hist_snippet = []
+            # Get exact historical snippet for chosen combination
+            hist_snippet = chosen_match.get("hist_snippet", [])
 
             proj_node_info = {
                 "date_range": hist_dr,
@@ -662,193 +651,9 @@ with tab_all_tricks:
             st.write(df_4m.to_html(escape=False, index=False), unsafe_allow_html=True)
 
 
-# ============================================================
-# TAB 3: PATTI / PANNA CYCLE & PATTERN ANALYZER
-# ============================================================
-with tab_patti:
-    st.markdown(f"### 🎴 पत्ती / पाना सायकल, गॅप व पॅटर्न विश्लेषक — `{selected_market}`")
-    st.caption("कोणतीही ३-अंकी पत्ती (उदा. 779) या मार्केटमध्ये किती दिवसांनी/खेळांनी येते, कोणता वार ठरलेला आहे का, ओपन/क्लोज पॅटर्न आणि सर्व २२० पत्त्यांचे ओव्हरड्यू विश्लेषण.")
-
-    p_engine = PattiAnalyzerEngine()
-
-    c_in1, c_in2, c_in3 = st.columns([1.3, 1.2, 1.5])
-    with c_in1:
-        input_patti = st.text_input("🎯 ३-अंकी पत्ती टाका (Enter 3-Digit Patti):", value="779", max_chars=3)
-    with c_in2:
-        pos_mode = st.selectbox(
-            "स्थान (Position Filter):",
-            ["BOTH", "OPEN", "CLOSE"],
-            format_func=lambda x: {"BOTH": "ओपन + क्लोज (Both)", "OPEN": "फक्त ओपन (Open Only)", "CLOSE": "फक्त क्लोज (Close Only)"}[x]
-        )
-    with c_in3:
-        quick_pick = st.selectbox(
-            "⚡ लोकप्रिय उदाहरणे (Presets):",
-            ["779 (DP - Ank 3)", "128 (SP - Ank 1)", "220 (DP - Ank 4)", "358 (SP - Ank 6)", "777 (TP - Ank 1)", "139 (SP - Ank 3)", "489 (SP - Ank 1)", "258 (SP - Ank 5)", "330 (DP - Ank 6)"]
-        )
-
-    # Clean input patti
-    clean_p = input_patti.strip() if input_patti else "779"
-    if not (clean_p.isdigit() and len(clean_p) == 3):
-        st.warning("⚠️ कृपया अचूक ३-अंकी पत्ती टाका (उदा. 779, 128, 220).")
-    else:
-        @st.cache_data(ttl=300, show_spinner=False)
-        def load_patti_analysis(mkt, p, pos):
-            return PattiAnalyzerEngine().analyze_patti(mkt, p, pos)
-
-        with st.spinner(f"`{selected_market}` मध्ये पत्ती `{clean_p}` चा इतिहास तपासत आहे..."):
-            p_res = load_patti_analysis(selected_market, clean_p, pos_mode)
-
-        if "error" in p_res:
-            st.error(p_res["error"])
-        else:
-            tot_hits = p_res["total_hits"]
-            avg_g = p_res["avg_gap_games"]
-            cur_over = p_res["current_overdue_games"]
-            is_over = p_res["is_overdue"]
-            p_type_name = p_res["type_name"]
-            p_ank = p_res["ank"]
-            dom_day = p_res["dominant_day"]
-            dom_count = p_res["dominant_day_count"]
-
-            # Key Metric Cards
-            m1, m2, m3, m4, m5 = st.columns(5)
-            m1.metric("पत्ती प्रकार व अंक", f"{p_res['patti']} (अंक {p_ank})", p_type_name)
-            m2.metric("एकूण वारंवारता", f"{tot_hits} वेळा", f"{p_res['total_games_scanned']} खेळांमध्ये")
-            m3.metric("सरासरी सायकल गॅप", f"दर {avg_g:.0f} खेळ" if avg_g > 0 else "—", "खेळानंतर येते")
-            
-            over_color = "🚨 ओव्हरड्यू" if is_over else "✅ सामान्य"
-            m4.metric("सध्याचा गॅप", f"{cur_over} खेळ आधी", over_color)
-            
-            day_marathi = {"Mon":"सोमवार","Tue":"मंगळवार","Wed":"बुधवार","Thu":"गुरुवार","Fri":"शुक्रवार","Sat":"शनिवार"}.get(dom_day, dom_day)
-            m5.metric("आवडता वार (Top Day)", f"{day_marathi}", f"{dom_count} वेळा ({round(dom_count/tot_hits*100 if tot_hits else 0)}%)")
-
-            # Pattern Insight Banner
-            st.markdown("---")
-            if is_over:
-                st.markdown(f"""
-                <div class="red-warning-box" style="border-color:#ff007f;background:#ff007f15;margin-bottom:15px;">
-                    <b style="color:#ff007f;font-size:15px;">🚨 ओव्हरड्यू अलर्ट (High Probability / Overdue Notice):</b><br>
-                    <span style="font-size:13px;color:#eee;">
-                        पत्ती <b>{p_res['patti']}</b> ही <code>{selected_market}</code> मध्ये सरासरी दर <b>{avg_g:.0f}</b> खेळांनंतर येते.<br>
-                        परंतु आता <b>{cur_over}</b> खेळ उलटून गेले आहेत (सरासरीच्या <b>{p_res['overdue_ratio']}%</b> काळ)! 
-                        त्यामुळे येत्या आठवड्यात ही पत्ती (किंवा अंक {p_ank}) येण्याची दाट शक्यता आहे!
-                    </span>
-                </div>
-                """, unsafe_allow_html=True)
-
-            # Detailed Pattern Summary Box
-            pos_info = " | ".join([f"{k}: {v} वेळा" for k, v in p_res["position_distribution"].items()])
-            jodi_info = ", ".join([f"<b>{j}</b> ({c}दा)" for j, c in p_res["common_jodis"]]) if p_res["common_jodis"] else "—"
-
-            st.markdown(f"""
-            <div style="background:#131326;border:1.5px solid #333366;border-radius:10px;padding:14px;margin-bottom:15px;">
-                <div style="font-size:15px;font-weight:bold;color:#00d2ff;margin-bottom:8px;">
-                    📊 पत्ती `{p_res['patti']}` चा मुख्य पॅटर्न सारांश (Pattern Breakdown):
-                </div>
-                <ul style="color:#ccc;font-size:13px;line-height:1.7;margin-bottom:0;">
-                    <li><b>वार पॅटर्न (Day Pattern):</b> ही पत्ती सर्वाधिक वेळा <b>{day_marathi} ({dom_day})</b> दिवशी आली आहे ({dom_count}/{tot_hits} वेळा).</li>
-                    <li><b>स्थान पॅटर्न (Position):</b> {pos_info}</li>
-                    <li><b>किमान व कमाल गॅप:</b> सर्वात जलद <b>{p_res['min_gap_games']}</b> खेळांत रिपीट झाली आणि सर्वात मोठा गॅप <b>{p_res['max_gap_games']}</b> खेळांचा होता.</li>
-                    <li><b>सोबत आलेल्या जोड्या (Associated Jodis):</b> {jodi_info}</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # Timeline Gap Chart
-            if p_res["appearances"]:
-                st.markdown("#### 📈 ऐतिहासिक गॅप सायकल चार्ट (Gap Between Appearances):")
-                chart_dates = [f"{a['date_range']} ({a['day']} - {a['position']})" for a in p_res["appearances"]]
-                chart_gaps = [a["gap_since_prev"] for a in p_res["appearances"]]
-                bar_colors = ["#ff007f" if g > avg_g else "#00d2ff" for g in chart_gaps]
-
-                fig_gap = go.Figure()
-                fig_gap.add_trace(go.Bar(
-                    x=chart_dates,
-                    y=chart_gaps,
-                    marker_color=bar_colors,
-                    text=[f"{g} खेळ" for g in chart_gaps],
-                    textposition="outside",
-                    name="गॅप (खेळ)"
-                ))
-                if avg_g > 0:
-                    fig_gap.add_hline(
-                        y=avg_g,
-                        line_dash="dash",
-                        line_color="#ffcc00",
-                        annotation_text=f"सरासरी गॅप: {avg_g:.0f} खेळ",
-                        annotation_position="top left"
-                    )
-
-                fig_gap.update_layout(
-                    paper_bgcolor="#0a0a15",
-                    plot_bgcolor="#0a0a15",
-                    font_color="#ccc",
-                    height=350,
-                    margin=dict(l=40, r=40, t=30, b=80),
-                    yaxis=dict(title="खेळांचा गॅप (Number of Games)", gridcolor="#1a1a2a"),
-                    xaxis=dict(tickangle=-45, gridcolor="#1a1a2a"),
-                    showlegend=False
-                )
-                st.plotly_chart(fig_gap, use_container_width=True)
-
-                # History Table
-                st.markdown(f"#### 📋 पत्ती `{p_res['patti']}` चा संपूर्ण इतिहास ({tot_hits} रेकॉर्ड्स):")
-                hist_rows = []
-                for i, a in enumerate(p_res["appearances"]):
-                    hist_rows.append({
-                        "क्र.": i + 1,
-                        "तारीख आठवडा (Date Range)": a["date_range"],
-                        "वार (Day)": a["day"],
-                        "स्थान (Position)": a["position"],
-                        "पत्ती (Panna)": a["panna"],
-                        "जोडी (Jodi)": a["jodi"],
-                        "विरुद्ध पत्ती": a["opp_panna"],
-                        "मागील खेळापासून गॅप": f"{a['gap_since_prev']} खेळ"
-                    })
-                st.dataframe(pd.DataFrame(hist_rows), use_container_width=True, height=260)
-            else:
-                st.info(f"ℹ️ `{selected_market}` च्या उपलब्ध रेकॉर्ड्समध्ये पत्ती `{p_res['patti']}` अद्याप आलेली नाही.")
-
-    # ── All 220 Pattis Cycle & Overdue Ranking ──
-    st.markdown("---")
-    with st.expander(f"🏆 `{selected_market}` मधील सर्व २२० पत्तींचे सायकल व ओव्हरड्यू रँकिंग (All 220 Pattis Cycle Table)", expanded=False):
-        st.markdown("या मार्केटमध्ये कोणत्या पत्त्या सर्वाधिक येतात, कोणत्या पत्त्यांचा गॅप संपत आला आहे आणि कोणत्या पत्त्या ओव्हरड्यू (Overdue) आहेत याची संपूर्ण यादी:")
-
-        c_f1, c_f2 = st.columns(2)
-        with c_f1:
-            filt_type = st.selectbox("पत्ती प्रकार फिल्टर (Filter by Type):", ["ALL", "SP", "DP", "TP"], format_func=lambda x: {"ALL":"सर्व २२० पत्त्या (All 220)","SP":"सिंगल पत्ती (SP - 120)","DP":"डबल पत्ती (DP - 90)","TP":"ट्रिपल पत्ती (TP - 10)"}[x])
-        with c_f2:
-            filt_ank = st.selectbox("अंक फिल्टर (Filter by Ank):", ["ALL", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"])
-
-        @st.cache_data(ttl=300, show_spinner=False)
-        def load_all_pattis_table(mkt, ptype):
-            return PattiAnalyzerEngine().get_all_pattis_overview(mkt, patti_type=ptype)
-
-        all_p_data = load_all_pattis_table(selected_market, filt_type)
-        if filt_ank != "ALL":
-            all_p_data = [x for x in all_p_data if str(x["ank"]) == filt_ank]
-
-        if all_p_data:
-            table_220 = []
-            for r in all_p_data:
-                alert_badge = "🚨 <b style='color:#ff007f;'>OVERDUE</b>" if r["is_overdue"] else "✅ <span style='color:#00ff88;'>OK</span>"
-                table_220.append({
-                    "पत्ती": f"<b>{r['patti']}</b>",
-                    "अंक": r["ank"],
-                    "प्रकार": r["type"],
-                    "एकूण वारंवारता": f"{r['total_hits']}दा",
-                    "सरासरी गॅप": f"दर {r['avg_gap']:.0f} खेळ" if r["avg_gap"] > 0 else "—",
-                    "सध्याचा गॅप": f"{r['current_overdue']} खेळ",
-                    "ओव्हरड्यू %": f"{r['overdue_ratio']}%" if r["avg_gap"] > 0 else "—",
-                    "स्थिती": alert_badge,
-                    "शेवटची कधी आली": r["last_seen"]
-                })
-            df_220 = pd.DataFrame(table_220)
-            st.write(df_220.to_html(escape=False, index=False), unsafe_allow_html=True)
-
 
 # ============================================================
-# TAB 4: DATE-WISE FIX FIGURES TRICK
+# TAB 3: DATE-WISE FIX FIGURES TRICK
 # ============================================================
 with tab_date:
     st.markdown(f"### 📅 तारीखेनुसार १००% फिक्स अंक ट्रिक (Date-Wise Fix Figure Analysis) — `{selected_market}`")

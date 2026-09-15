@@ -5,7 +5,6 @@ from src.storage.database import MatkaDatabase
 from src.engine.family_triangle_engine import FamilyTriangleEngine, render_family_triangle_panel_html
 from src.engine.date_figure_engine import DateFigureEngine
 from src.engine.cross_line_engine import CrossLineEngine
-from src.engine.patti_analyzer import PattiAnalyzerEngine
 from src.engine.tricks_engine import TrickAnalyzer, TRICKS
 
 class TestConfigAndMath(unittest.TestCase):
@@ -109,19 +108,6 @@ class TestCrossLineEngine(unittest.TestCase):
             self.assertIn('predicted_jodi', m)
             self.assertIn('predicted_family', m)
             self.assertIn('confidence', m)
-
-class TestPattiAnalyzer(unittest.TestCase):
-    def setUp(self):
-        self.engine = PattiAnalyzerEngine()
-
-    def test_patti_analysis(self):
-        res = self.engine.analyze_patti('KALYAN', '779')
-        self.assertIn('patti', res)
-        self.assertEqual(res['patti'], '779')
-        self.assertIn('total_hits', res)
-        self.assertIn('day_distribution', res)
-        self.assertIn('gaps', res)
-        self.assertIn('avg_gap_games', res)
 
 class TestTricksEngine(unittest.TestCase):
     def setUp(self):
