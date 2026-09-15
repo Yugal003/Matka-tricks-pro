@@ -1,4 +1,4 @@
-﻿import unittest
+import unittest
 import math
 from src.config import get_jodi_family, CUT_NUMBERS, POPULAR_MARKETS
 from src.storage.database import MatkaDatabase
@@ -144,6 +144,38 @@ class TestTricksEngine(unittest.TestCase):
         self.assertIn('mon', w)
         self.assertIn('tue', w)
         self.assertIn('is_pass', w)
+
+class TestFamilySequenceTriangleEngine(unittest.TestCase):
+    def test_81_and_23_sequence_prediction(self):
+        """Verify user's exact example: 81 and 23 predict 33 family and 30 family"""
+        from src.engine.family_sequence_triangle_engine import find_family_pair_sequence, FamilySequenceTriangleEngine, render_family_sequence_triangle_panel_html
+        seqs = find_family_pair_sequence('81', '23')
+        self.assertGreater(len(seqs), 0)
+        
+        # Check that 33 family (forward) and 30 family (backward) are predicted
+        all_fwd = []
+        all_bwd = []
+        for s in seqs:
+            all_fwd.extend(s['fwd_family'])
+            all_bwd.extend(s['bwd_family'])
+            
+        self.assertIn('33', set(all_fwd))
+        self.assertIn('38', set(all_fwd))
+        self.assertIn('30', set(all_bwd))
+        self.assertIn('58', set(all_bwd))
+
+    def test_sequence_triangle_engine_kalyan(self):
+        """Verify sequence engine scans Kalyan chart and generates valid SVG HTML"""
+        from src.engine.family_sequence_triangle_engine import FamilySequenceTriangleEngine, render_family_sequence_triangle_panel_html
+        eng = FamilySequenceTriangleEngine()
+        snip = eng.get_snippet('KALYAN', rows_count=4)
+        res = eng.find_all_sequence_triangles(snip, target_day='Mon')
+        self.assertIn('completed', res)
+        self.assertIn('projected', res)
+        all_seq = res['completed'] + res['projected']
+        html = render_family_sequence_triangle_panel_html(snip, all_seq, active_idx=0 if all_seq else None)
+        self.assertIn('<svg', html)
+        self.assertIn('<table', html)
 
 if __name__ == '__main__':
     unittest.main()

@@ -12,6 +12,7 @@ from src.engine.cross_line_visualizer import render_cross_line_panel_html
 from src.engine.patti_analyzer import PattiAnalyzerEngine, ALL_220_PATTIS
 from src.engine.date_figure_engine import DateFigureEngine, USER_DATE_MAP
 from src.engine.family_triangle_engine import FamilyTriangleEngine, render_family_triangle_panel_html
+from src.engine.family_sequence_triangle_engine import FamilySequenceTriangleEngine, render_family_sequence_triangle_panel_html, find_family_pair_sequence
 from src.scraper.ingest import run_ingestion
 from src.config import POPULAR_MARKETS, get_jodi_family, CUT_NUMBERS
 import textwrap
@@ -223,12 +224,13 @@ st.markdown('<div class="main-title">🎯 मटका क्रॉस लाई
 st.markdown(f'<div class="sub-title">निवडलेला मार्केट: <b style="color:#ffcc00;font-size:15px;">{selected_market}</b> &nbsp;|&nbsp; टार्गेट: <b style="color:#00ffcc;font-size:15px;">{target_day}</b></div>', unsafe_allow_html=True)
 
 # ── Main Tabs ───────────────────────────────────────────────
-tab_cross, tab_all_tricks, tab_patti, tab_date, tab_triangle = st.tabs([
+tab_cross, tab_all_tricks, tab_patti, tab_date, tab_triangle, tab_seq_triangle = st.tabs([
     "📐 क्रॉस लाईन फॅमिली मॅचिंग ट्रिक (Cross Line / Line Dekho)",
     "📊 इतर सर्व 22 ट्रिक्स झोन (Tricks Zone Pass/Fail)",
     "🎴 पत्ती / पाना सायकल व पॅटर्न विश्लेषक (Patti / Panna Analyzer)",
     "📅 तारीखेनुसार १००% फिक्स अंक ट्रिक (Date-Wise Fix Figures)",
     "🔺 चालू चार्ट फॅमिली त्रिकोण स्कीम (Family Triangle Scheme)",
+    "⚡ चालू चार्ट फॅमिली सीक्वेन्स त्रिकोण (Sequence Triangle Scheme)",
 ])
 
 # ============================================================
@@ -1174,6 +1176,199 @@ with tab_triangle:
             })
         if all_rows_tri:
             st.write(pd.DataFrame(all_rows_tri).to_html(escape=False, index=False), unsafe_allow_html=True)
+
+
+# ============================================================
+# TAB 6: FAMILY SEQUENCE TRIANGLE SCHEME (फॅमिली सीक्वेन्स त्रिकोण)
+# ============================================================
+with tab_seq_triangle:
+    st.markdown(f"### ⚡ चालू चार्ट फॅमिली सीक्वेन्स त्रिकोण (Family Sequence Triangle) — `{selected_market}`")
+    
+    st.info("""
+    **💡 फॅमिली सीक्वेन्स त्रिकोण स्कीमचा नियम (Family Sequence Rule):**
+    - **नियम:** अंक वेगळे न बघता **पूर्ण २-अंकी जोडी लेव्हलवर सलग फॅमिली क्रम (Sequence)** तपासला जातो.
+    - **उदा.** त्रिकोणात टोक १ = **`81`** (यात ३१ आहे) आणि टोक २ = **`23`** (यात ३२ आहे) $\implies$ **`31 ➔ 32`** चा सलग +१ क्रम तयार झाला!
+    - **🎯 टार्गेट टोक (`??`):** हा क्रम पूर्ण करण्यासाठी चालू दिवशी २ संभाव्य फॅमिलीज मिळतात:
+      1. ⏩ **पुढील क्रम (+१):** $31 \to 32 \to \mathbf{33}$ $\implies$ **३३ ची फॅमिली** (`33, 38, 83, 88`)
+      2. ⏪ **मागील क्रम (-१):** $\mathbf{30} \to 31 \to 32$ $\implies$ **३० ची फॅमिली** (`30, 35, 80, 85, 03, 08, 53, 58`)
+    """)
+
+    seq_tri_engine = FamilySequenceTriangleEngine()
+
+    c_sq1, c_sq2 = st.columns([1.2, 1.8])
+    with c_sq1:
+        seq_rows_cnt = st.radio("चालू चार्ट ओळींची संख्या (Chart Rows):", [2, 3, 4, 5, 6], index=1, horizontal=True, key="seq_rows_rad")
+    with c_sq2:
+        seq_mode = st.radio(
+            "सीक्वेन्स पाहण्याची पद्धत (Sequence View Mode):",
+            [
+                "🎯 टार्गेट फॅमिली सीक्वेन्स (Projected to Target '??')",
+                "⚡ पूर्ण झालेले फॅमिली सीक्वेन्स (Completed Sequences)",
+                "✨ सर्व सीक्वेन्स एकत्र पाहा (Overlay All)"
+            ],
+            index=0,
+            horizontal=True,
+            key="seq_mode_rad"
+        )
+
+    @st.cache_data(ttl=300, show_spinner=False)
+    def load_seq_triangle_data(mkt, rows, t_day):
+        eng = FamilySequenceTriangleEngine()
+        snip = eng.get_snippet(mkt, rows_count=rows)
+        data = eng.find_all_sequence_triangles(snip, target_day=t_day)
+        return snip, data
+
+    with st.spinner(f"`{selected_market}` च्या शेवटच्या {seq_rows_cnt} ओळींमध्ये फॅमिली सीक्वेन्स शोधत आहे..."):
+        seq_snip, seq_data = load_seq_triangle_data(selected_market, seq_rows_cnt, target_day)
+
+    comp_seq_tri = seq_data.get("completed", [])
+    proj_seq_tri = seq_data.get("projected", [])
+
+    if seq_mode.startswith("🎯"):
+        st.markdown(f"#### 🎯 टार्गेट `{target_day}` कडे जाणारे फॅमिली सीक्वेन्स त्रिकोण ({len(proj_seq_tri)} सापडले):")
+        
+        if proj_seq_tri:
+            opt_seq_labels = [
+                f"सीक्वेन्स #{i+1}: {t['summary']} ➔ {t['sequence_formula']}"
+                for i, t in enumerate(proj_seq_tri)
+            ]
+            sel_seq_idx = st.selectbox("📌 पाहायचा असलेला टार्गेट सीक्वेन्स निवडा:", range(len(proj_seq_tri)), format_func=lambda i: opt_seq_labels[i], index=0)
+            chosen_seq = proj_seq_tri[sel_seq_idx]
+            
+            # Render SVG Chart
+            seq_chart_html = render_family_sequence_triangle_panel_html(
+                grid_snippet=seq_snip,
+                triangles=proj_seq_tri,
+                active_idx=sel_seq_idx,
+                title=f"⚡ टार्गेट फॅमिली सीक्वेन्स #{sel_seq_idx+1} (शेवटच्या {seq_rows_cnt} ओळी — टार्गेट: {target_day})"
+            )
+            st.markdown(seq_chart_html, unsafe_allow_html=True)
+
+            # Details card
+            node_A, node_B, node_T = chosen_seq["nodes"]
+            fwd_pills = "".join([f'<span class="family-pill">{j}</span>' for j in chosen_seq["fwd_family"]])
+            bwd_pills = "".join([f'<span class="family-pill" style="border-color:#ff007f80;color:#ff77aa;">{j}</span>' for j in chosen_seq["bwd_family"]])
+            
+            st.markdown(f"""
+            <div style="background:#13112b;border:2px solid #00d2ff;border-radius:12px;padding:16px;margin-bottom:15px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                    <span style="font-size:18px;font-weight:900;color:#00d2ff;">⚡ सीक्वेन्स #{sel_seq_idx+1} भाकीत — {target_day}</span>
+                    <span style="background:#00d2ff22;border:1px solid #00d2ff;color:#00d2ff;padding:3px 10px;border-radius:15px;font-weight:bold;font-size:12px;">
+                        {chosen_seq['type_title']}
+                    </span>
+                </div>
+                <div style="font-size:15px;color:#fff;margin-bottom:12px;background:#1b1938;padding:8px 12px;border-radius:8px;">
+                    <b style="color:#ffcc00;">🔗 सीक्वेन्स फॉर्म्युला:</b> <span style="color:#00ffcc;font-weight:bold;">{chosen_seq['sequence_formula']}</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+                    <div class="match-step-badge">
+                        <span style="color:#00d2ff;font-weight:bold;">① टोक १:</span> <span class="jodi-pill">{node_A['jodi']}</span> ({node_A['day']} · {node_A['date_range']})
+                    </div>
+                    <div class="match-step-badge">
+                        <span style="color:#00d2ff;font-weight:bold;">② टोक २:</span> <span class="jodi-pill">{node_B['jodi']}</span> ({node_B['day']} · {node_B['date_range']})
+                    </div>
+                    <div class="match-step-badge" style="border-color:#ff007f;background:#ff007f15;">
+                        <span style="color:#ff007f;font-weight:bold;">🎯 टार्गेट ३:</span> <span class="jodi-pill" style="border-color:#ff007f;color:#ff007f;">??</span> ({target_day} चालू आठवडा)
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:12px;">
+                    <div style="background:#0c1d24;border:1.5px solid #00ffcc;border-radius:10px;padding:12px;">
+                        <b style="color:#00ffcc;font-size:14px;">⏩ पुढील क्रम (+१) ➔ {chosen_seq['fwd_target_jodi']} ची फॅमिली:</b>
+                        <div style="margin-top:6px;">{fwd_pills}</div>
+                    </div>
+                    <div style="background:#240c1d;border:1.5px solid #ff007f;border-radius:10px;padding:12px;">
+                        <b style="color:#ff007f;font-size:14px;">⏪ मागील क्रम (-१) ➔ {chosen_seq['bwd_target_jodi']} ची फॅमिली:</b>
+                        <div style="margin-top:6px;">{bwd_pills}</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info(f"ℹ️ चालू चार्टच्या शेवटच्या {seq_rows_cnt} ओळींमध्ये {target_day} साठी फॅमिली सीक्वेन्स सापडला नाही. ओळींची संख्या बदलून पाहा.")
+
+    elif seq_mode.startswith("⚡"):
+        st.markdown(f"#### ⚡ चार्टमधील पूर्ण झालेले फॅमिली सीक्वेन्स त्रिकोण ({len(comp_seq_tri)} सापडले):")
+        
+        if comp_seq_tri:
+            opt_c_labels = [
+                f"सीक्वेन्स #{i+1}: {t['summary']} ➔ {t['sequence_desc']}"
+                for i, t in enumerate(comp_seq_tri)
+            ]
+            sel_c_idx = st.selectbox("📌 पाहायचा असलेला पूर्ण सीक्वेन्स निवडा:", range(len(comp_seq_tri)), format_func=lambda i: opt_c_labels[i], index=0)
+            chosen_c = comp_seq_tri[sel_c_idx]
+            
+            c_chart_html = render_family_sequence_triangle_panel_html(
+                grid_snippet=seq_snip,
+                triangles=comp_seq_tri,
+                active_idx=sel_c_idx,
+                title=f"⚡ पूर्ण झालेला फॅमिली सीक्वेन्स #{sel_c_idx+1} ({chosen_c['type_title']})"
+            )
+            st.markdown(c_chart_html, unsafe_allow_html=True)
+
+            nA, nB, nC = chosen_c["nodes"]
+            st.markdown(f"""
+            <div style="background:#121226;border:2px solid #00ff88;border-radius:12px;padding:16px;margin-bottom:15px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                    <span style="font-size:18px;font-weight:900;color:#00ff88;">⚡ पूर्ण झालेला सीक्वेन्स #{sel_c_idx+1}</span>
+                    <span style="background:#00ff8822;border:1px solid #00ff88;color:#00ff88;padding:3px 10px;border-radius:15px;font-weight:bold;font-size:12px;">
+                        {chosen_c['type_title']}
+                    </span>
+                </div>
+                <div style="font-size:15px;color:#fff;margin-bottom:12px;background:#18261e;padding:8px 12px;border-radius:8px;">
+                    <b style="color:#ffcc00;">🔗 पूर्ण झालेला क्रम:</b> <span style="color:#00ff88;font-weight:bold;">{chosen_c['sequence_desc']}</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                    <div class="match-step-badge">
+                        <span style="color:#00d2ff;font-weight:bold;">① टोक १:</span> <span class="jodi-pill">{nA['jodi']}</span> ({nA['day']} · {nA['date_range']})
+                    </div>
+                    <div class="match-step-badge">
+                        <span style="color:#00d2ff;font-weight:bold;">② टोक २:</span> <span class="jodi-pill">{nB['jodi']}</span> ({nB['day']} · {nB['date_range']})
+                    </div>
+                    <div class="match-step-badge" style="border-color:#00ff88;background:#00ff8815;">
+                        <span style="color:#00ff88;font-weight:bold;">③ टोक ३:</span> <span class="jodi-pill" style="border-color:#00ff88;color:#00ff88;">{nC['jodi']}</span> ({nC['day']} · {nC['date_range']})
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info(f"ℹ️ चालू चार्टच्या शेवटच्या {seq_rows_cnt} ओळींमध्ये पूर्ण झालेले सीक्वेन्स सापडले नाहीत.")
+
+    else:
+        st.markdown(f"#### ✨ सर्व फॅमिली सीक्वेन्स एकत्र चार्टवर ({len(comp_seq_tri)} पूर्ण + {len(proj_seq_tri)} टार्गेट):")
+        all_seq_combined = comp_seq_tri + proj_seq_tri
+        if all_seq_combined:
+            overlay_seq_html = render_family_sequence_triangle_panel_html(
+                grid_snippet=seq_snip,
+                triangles=all_seq_combined[:6],
+                active_idx=None,
+                title=f"✨ सर्व फॅमिली सीक्वेन्स एकत्रित ओव्हरले (शेवटचे {seq_rows_cnt} आठवडे)"
+            )
+            st.markdown(overlay_seq_html, unsafe_allow_html=True)
+        else:
+            st.info("ℹ️ कोणतेही सीक्वेन्स सापडले नाहीत.")
+
+    # Summary table
+    st.markdown("---")
+    with st.expander(f"📋 चालू चार्टमधील सर्व फॅमिली सीक्वेन्स यादी ({len(comp_seq_tri)} पूर्ण / {len(proj_seq_tri)} टार्गेट)", expanded=False):
+        all_rows_s = []
+        for i, t in enumerate(comp_seq_tri):
+            all_rows_s.append({
+                "प्रकार": "⚡ पूर्ण सीक्वेन्स",
+                "क्रम": t["sequence_desc"],
+                "टोके (Vertices)": t["summary"],
+                "जोड्या": ", ".join(t["jodis"]),
+            })
+        for i, t in enumerate(proj_seq_tri):
+            all_rows_s.append({
+                "प्रकार": "🎯 टार्गेट सीक्वेन्स",
+                "क्रम": t["sequence_formula"],
+                "टोके (Vertices)": t["summary"],
+                "पुढील फॅमिली (+१)": ", ".join(t["fwd_family"][:4]) + "...",
+                "मागील फॅमिली (-१)": ", ".join(t["bwd_family"][:4]) + "...",
+            })
+        if all_rows_s:
+            st.write(pd.DataFrame(all_rows_s).to_html(escape=False, index=False), unsafe_allow_html=True)
+
 
 
 
