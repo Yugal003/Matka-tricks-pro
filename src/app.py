@@ -810,7 +810,10 @@ with tab_triangle:
     @st.cache_data(ttl=300, show_spinner=False)
     def load_triangle_data(mkt, rows, t_day):
         eng = FamilyTriangleEngine()
-        snip = eng.get_snippet(mkt, rows_count=rows, target_day=t_day)
+        try:
+            snip = eng.get_snippet(mkt, rows_count=rows, target_day=t_day)
+        except TypeError:
+            snip = eng.get_snippet(mkt, rows_count=rows)
         data = eng.find_all_triangles(snip, target_day=t_day)
         return snip, data
 
@@ -1016,7 +1019,10 @@ with tab_seq_triangle:
     @st.cache_data(ttl=300, show_spinner=False)
     def load_seq_triangle_data(mkt, rows, t_day):
         eng = FamilySequenceTriangleEngine()
-        snip = eng.get_snippet(mkt, rows_count=rows, target_day=t_day)
+        try:
+            snip = eng.get_snippet(mkt, rows_count=rows, target_day=t_day)
+        except TypeError:
+            snip = eng.get_snippet(mkt, rows_count=rows)
         data = eng.find_all_sequence_triangles(snip, target_day=t_day)
         return snip, data
 

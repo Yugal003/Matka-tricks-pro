@@ -90,7 +90,7 @@ class CrossLineEngine:
     def __init__(self, db: Optional[MatkaDatabase] = None):
         self.db = db or MatkaDatabase()
 
-    def get_grid(self, market: str, max_weeks: int = 300, target_day: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_grid(self, market: str, max_weeks: int = 300, target_day: Optional[str] = None, *args, **kwargs) -> List[Dict[str, Any]]:
         """Returns chronological weekly grid [W0, W1, ... W_latest]"""
         df = self.db.get_market_results(market, limit=max_weeks * 7)
         if df.empty:

@@ -136,7 +136,7 @@ class FamilySequenceTriangleEngine:
     def __init__(self, db: Optional[MatkaDatabase] = None):
         self.db = db or MatkaDatabase()
 
-    def get_snippet(self, market: str, rows_count: int = 5, target_day: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_snippet(self, market: str, rows_count: int = 5, target_day: Optional[str] = None, *args, **kwargs) -> List[Dict[str, Any]]:
         df = self.db.get_market_results(market, limit=rows_count * 7 * 2)
         if df.empty:
             return []
