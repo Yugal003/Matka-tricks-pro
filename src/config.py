@@ -29,6 +29,8 @@ POPULAR_MARKETS = [
     {"name": "MADHUR NIGHT", "slug": "madhur-night", "open_time": "08:30 PM", "close_time": "10:30 PM"},
     {"name": "RAJDHANI DAY", "slug": "rajdhani-day", "open_time": "03:00 PM", "close_time": "05:00 PM"},
     {"name": "RAJDHANI NIGHT", "slug": "rajdhani-night", "open_time": "09:35 PM", "close_time": "11:45 PM"},
+    {"name": "SUPREME DAY", "slug": "supreme-day", "open_time": "03:35 PM", "close_time": "05:35 PM"},
+    {"name": "SUPREME NIGHT", "slug": "supreme-night", "open_time": "08:45 PM", "close_time": "10:45 PM"},
 ]
 
 # Cut Digits Map (Opposite Number in Matka Rules)

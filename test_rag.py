@@ -1,5 +1,11 @@
-﻿import os
+import os
 import sys
+
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 sys.path.insert(0, os.path.abspath("."))
 

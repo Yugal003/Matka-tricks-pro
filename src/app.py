@@ -496,30 +496,6 @@ with tab_cross:
             })
 
         df_m = pd.DataFrame(table_rows)
-        st.dataframe(df_m, use_container_width=True, height=300)
-
-        # ── All Historical Matches Table ──
-        st.markdown("---")
-        st.markdown(f"### 📋 इतिहासात सापडलेल्या सर्व क्रॉस लाईन्सचा सारांश ({len(matches)} एकूण कॉम्बिनेशन्स):")
-        
-        table_rows = []
-        for i, m in enumerate(matches):
-            cur_j = " ➔ ".join([s["jodi"] for s in m["current_sequence"]])
-            hist_j = " ➔ ".join([h["jodi"] for h in m["historical_line"]])
-            types = ", ".join([h["match_type"][:3] for h in m["historical_line"]])
-            table_rows.append({
-                "क्र.": i + 1,
-                "टच": f"{m['match_length']}-टच",
-                "विश्वासार्हता": f"{m['confidence']}%",
-                "चालू लाईन": cur_j,
-                "इतिहास क्रॉस लाईन": hist_j,
-                "मॅच प्रकार": types,
-                "इतिहास तारीख": f"{m['hist_anchor_day']} ({m['hist_anchor_date']})",
-                "भविष्यवाणी जोडी": m["predicted_jodi"],
-                "8-फॅमिली जोड्या": ", ".join(m["predicted_family"]),
-            })
-
-        df_m = pd.DataFrame(table_rows)
         st.dataframe(df_m, use_container_width=True, height=350)
 
     else:
