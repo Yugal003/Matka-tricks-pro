@@ -130,13 +130,18 @@ class FamilySequenceTriangleEngine:
                         "family": get_jodi_family(j)
                     })
 
-        # 1. Completed Triangles (Node A -> Node B -> Node C form a sequence)
+        target_r = len(grid_snippet) - 1
+        target_c = DAY_COLS.get(target_day, 0)
+        target_dr = grid_snippet[-1].get("date_range", "")
+
+        # 1. Completed Triangles (Node A -> Node B -> Node C form a sequence in completed past rows)
         completed = []
-        n_nodes = len(nodes)
+        comp_nodes = [n for n in nodes if n["r"] < target_r]
+        n_nodes = len(comp_nodes)
         for i in range(n_nodes):
             for j in range(i + 1, n_nodes):
                 for k in range(j + 1, n_nodes):
-                    A, B, C = nodes[i], nodes[j], nodes[k]
+                    A, B, C = comp_nodes[i], comp_nodes[j], comp_nodes[k]
                     # Check non-collinear
                     area2 = (B["c"] - A["c"]) * (C["r"] - A["r"]) - (B["r"] - A["r"]) * (C["c"] - A["c"])
                     if area2 == 0:
@@ -173,10 +178,9 @@ class FamilySequenceTriangleEngine:
                         })
 
         # 2. Projected Triangles (Node A and Node B point to target ??)
+        # Nodes A and B come ONLY from past completed rows (r < target_r).
+        # The current active row (target_r) is NEVER used as a base vertex!
         projected = []
-        target_r = len(grid_snippet) - 1
-        target_c = DAY_COLS.get(target_day, 0)
-        target_dr = grid_snippet[-1].get("date_range", "")
 
         target_node = {
             "r": target_r,
@@ -187,7 +191,7 @@ class FamilySequenceTriangleEngine:
             "is_target": True
         }
 
-        past_nodes = [n for n in nodes if not (n["r"] == target_r and n["c"] == target_c)]
+        past_nodes = [n for n in nodes if n["r"] < target_r]
 
         for i in range(len(past_nodes)):
             for j in range(i + 1, len(past_nodes)):
@@ -239,8 +243,8 @@ def render_family_sequence_triangle_panel_html(
 
     DATE_W = 95
     CELL_W = 70
-    ROW_H = 50
-    HEADER_H = 30
+    ROW_H = 56
+    HEADER_H = 42
 
     total_w = DATE_W + len(DAY_ORDER) * CELL_W
     svg_h = HEADER_H + len(grid_snippet) * ROW_H
@@ -292,8 +296,8 @@ def render_family_sequence_triangle_panel_html(
     # Table Header
     thead = f"""<thead>
         <tr style="background:#15152b;color:#ddd;font-size:12px;height:{HEADER_H}px;">
-            <th style="border:1px solid #444;width:{DATE_W}px;text-align:center;">Date Range</th>
-            {''.join([f'<th style="border:1px solid #444;width:{CELL_W}px;text-align:center;color:#00d2ff;">{DAY_MARATHI[d]}<br><span style="color:#888;font-size:10px;">{d}</span></th>' for d in DAY_ORDER])}
+            <th style="border:1px solid #444;width:{DATE_W}px;text-align:center;box-sizing:border-box;padding:2px 0;height:{HEADER_H}px;line-height:1.1;">Date Range</th>
+            {''.join([f'<th style="border:1px solid #444;width:{CELL_W}px;text-align:center;color:#00d2ff;box-sizing:border-box;padding:2px 0;height:{HEADER_H}px;line-height:1.1;">{DAY_MARATHI[d]}<br><span style="color:#888;font-size:10px;">{d}</span></th>' for d in DAY_ORDER])}
         </tr>
     </thead>"""
 
@@ -308,7 +312,7 @@ def render_family_sequence_triangle_panel_html(
     for r_idx, w in enumerate(grid_snippet):
         dr = w.get("date_range", "")
         disp_dr = dr.replace(" to ", "<br>to<br>")
-        date_td = f'<td style="font-size:9.5px;padding:2px;border:1px solid #333;background:#131322;color:#aaa;text-align:center;width:{DATE_W}px;line-height:1.2;">{disp_dr}</td>'
+        date_td = f'<td style="font-size:9px;padding:2px;border:1px solid #333;background:#131322;color:#aaa;text-align:center;width:{DATE_W}px;height:{ROW_H}px;box-sizing:border-box;line-height:1.2;">{disp_dr}</td>'
 
         day_tds = ""
         for c_idx, d in enumerate(DAY_ORDER):
@@ -331,16 +335,16 @@ def render_family_sequence_triangle_panel_html(
                     jodi_html = f'<div style="font-size:14px;color:#888;font-weight:600;">{jodi}</div>'
 
             bg = "#1a1a2e" if r_idx % 2 == 0 else "#141424"
-            day_tds += f'<td style="border:1px solid #222;text-align:center;padding:1px;background:{bg};width:{CELL_W}px;height:{ROW_H}px;">{jodi_html}</td>'
+            day_tds += f'<td style="border:1px solid #222;text-align:center;padding:0;background:{bg};width:{CELL_W}px;height:{ROW_H}px;box-sizing:border-box;">{jodi_html}</td>'
 
-        tbody_rows += f'<tr style="height:{ROW_H}px;">{date_td}{day_tds}</tr>'
+        tbody_rows += f'<tr style="height:{ROW_H}px;box-sizing:border-box;">{date_td}{day_tds}</tr>'
 
     return f"""
 <div style="background:#0a0a16;border:2px solid #00d2ff;border-radius:12px;padding:12px;margin-bottom:15px;overflow-x:auto;">
     <div style="font-size:16px;font-weight:900;color:#00d2ff;margin-bottom:10px;">{title}</div>
     <div style="position:relative;display:inline-block;min-width:100%;">
         {svg_overlay}
-        <table style="width:{total_w}px;border-collapse:collapse;table-layout:fixed;position:relative;z-index:2;">
+        <table style="width:{total_w}px;border-collapse:collapse;table-layout:fixed;position:relative;z-index:2;box-sizing:border-box;margin:0;">
             {thead}
             <tbody>{tbody_rows}</tbody>
         </table>
