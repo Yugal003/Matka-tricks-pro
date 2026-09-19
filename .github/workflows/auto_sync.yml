@@ -1,4 +1,4 @@
-﻿name: Daily Matka Data Auto-Sync
+name: Daily Matka Data Auto-Sync
 
 on:
   schedule:
@@ -9,6 +9,8 @@ on:
 jobs:
   sync-data:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,7 +31,12 @@ jobs:
 
       - name: Commit and Push Updated Data
         run: |
-          git config --global user.name 'Matka-Sync-Bot'
-          git config --global user.email 'bot@github.com'
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add data/
-          git diff --quiet && git diff --staged --quiet || (git commit -m  Auto-sync latest charts from DpBoss [skip ci] && git push)
+          if git diff --staged --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "Auto-sync latest charts from DpBoss [skip ci]"
+            git push origin main
+          fi
