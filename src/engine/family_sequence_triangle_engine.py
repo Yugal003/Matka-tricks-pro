@@ -8,13 +8,60 @@ Finds geometric triangles where vertices form a progressive Family Sequence (स
 """
 
 import math
+import datetime
+import re
 from typing import List, Dict, Any, Optional, Tuple
 from src.config import get_jodi_family, CUT_NUMBERS
 from src.storage.database import MatkaDatabase
 
-DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 DAY_COLS = {d: i for i, d in enumerate(DAY_ORDER)}
-DAY_MARATHI = {"Mon": "सोमवार", "Tue": "मंगळवार", "Wed": "बुधवार", "Thu": "गुरुवार", "Fri": "शुक्रवार", "Sat": "शनिवार"}
+DAY_MARATHI = {"Mon": "सोमवार", "Tue": "मंगळवार", "Wed": "बुधवार", "Thu": "गुरुवार", "Fri": "शुक्रवार", "Sat": "शनिवार", "Sun": "रविवार"}
+
+def compute_next_week_date_range(dr: str) -> str:
+    m = re.search(r"(\d{2})/(\d{2})/(\d{4}) to (\d{2})/(\d{2})/(\d{4})", dr)
+    if m:
+        s_d, s_m, s_y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        e_d, e_m, e_y = int(m.group(4)), int(m.group(5)), int(m.group(6))
+        start_dt = datetime.date(s_y, s_m, s_d) + datetime.timedelta(days=7)
+        span = (datetime.date(e_y, e_m, e_d) - datetime.date(s_y, s_m, s_d)).days
+        end_dt = start_dt + datetime.timedelta(days=span)
+        return f"{start_dt.strftime('%d/%m/%Y')} to {end_dt.strftime('%d/%m/%Y')}"
+    m1 = re.search(r"(\d{2})/(\d{2})/(\d{4})", dr)
+    if m1:
+        d, mth, y = int(m1.group(1)), int(m1.group(2)), int(m1.group(3))
+        start_dt = datetime.date(y, mth, d) + datetime.timedelta(days=7)
+        end_dt = start_dt + datetime.timedelta(days=6)
+        return f"{start_dt.strftime('%d/%m/%Y')} to {end_dt.strftime('%d/%m/%Y')}"
+    m2 = re.search(r"(\d{4})-(\d{2})-(\d{2}) [Tt]o (\d{4})-(\d{2})-(\d{2})", dr)
+    if m2:
+        s_y, s_m, s_d = int(m2.group(1)), int(m2.group(2)), int(m2.group(3))
+        e_y, e_m, e_d = int(m2.group(4)), int(m2.group(5)), int(m2.group(6))
+        start_dt = datetime.date(s_y, s_m, s_d) + datetime.timedelta(days=7)
+        span = (datetime.date(e_y, e_m, e_d) - datetime.date(s_y, s_m, s_d)).days
+        end_dt = start_dt + datetime.timedelta(days=span)
+        return f"{start_dt.strftime('%Y-%m-%d')} To {end_dt.strftime('%Y-%m-%d')}"
+    return "Next Week"
+
+def should_advance_to_next_week(last_row: Dict[str, Any], target_day: Optional[str] = None) -> bool:
+    if not last_row:
+        return False
+    # 1. Target day was already declared in the last row
+    if target_day and target_day in last_row.get("days", {}):
+        return True
+    # 2. Date range has ended in real time (e.g. from 21-09-2026 onwards)
+    dr = last_row.get("date_range", "")
+    m = re.search(r"(\d{2})/(\d{2})/(\d{4}) to (\d{2})/(\d{2})/(\d{4})", dr)
+    if m:
+        e_d, e_m, e_y = int(m.group(4)), int(m.group(5)), int(m.group(6))
+        if datetime.date.today() > datetime.date(e_y, e_m, e_d):
+            return True
+    m2 = re.search(r"(\d{4})-(\d{2})-(\d{2}) [Tt]o (\d{4})-(\d{2})-(\d{2})", dr)
+    if m2:
+        e_y, e_m, e_d = int(m2.group(4)), int(m2.group(5)), int(m2.group(6))
+        if datetime.date.today() > datetime.date(e_y, e_m, e_d):
+            return True
+    return False
 
 TRIANGLE_PALETTES = [
     {"stroke": "#00d2ff", "fill": "rgba(0, 210, 255, 0.18)", "glow": "rgba(0, 210, 255, 0.6)"},
@@ -89,7 +136,7 @@ class FamilySequenceTriangleEngine:
     def __init__(self, db: Optional[MatkaDatabase] = None):
         self.db = db or MatkaDatabase()
 
-    def get_snippet(self, market: str, rows_count: int = 5) -> List[Dict[str, Any]]:
+    def get_snippet(self, market: str, rows_count: int = 5, target_day: Optional[str] = None) -> List[Dict[str, Any]]:
         df = self.db.get_market_results(market, limit=rows_count * 7 * 2)
         if df.empty:
             return []
@@ -105,6 +152,12 @@ class FamilySequenceTriangleEngine:
                     "is_red": int(r["is_red_jodi"]),
                 }
             grid.append(row)
+
+        # If target_day is already declared or current week has ended, advance to upcoming week
+        if grid and should_advance_to_next_week(grid[-1], target_day):
+            next_dr = compute_next_week_date_range(grid[-1]["date_range"])
+            grid.append({"date_range": next_dr, "days": {}})
+
         return grid[-rows_count:] if len(grid) >= rows_count else grid
 
     def find_all_sequence_triangles(

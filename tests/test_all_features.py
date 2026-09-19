@@ -178,6 +178,80 @@ class TestFamilySequenceTriangleEngine(unittest.TestCase):
             self.assertIn('fill', p)
             self.assertIn('glow', p)
 
+    def test_sunday_support_and_constants(self):
+        """Verify Sunday is supported across all engines"""
+        from src.engine.family_triangle_engine import DAY_ORDER as FT_DAYS, DAY_COLS as FT_COLS, DAY_MARATHI as FT_MAR
+        from src.engine.family_sequence_triangle_engine import DAY_ORDER as FST_DAYS, DAY_COLS as FST_COLS, DAY_MARATHI as FST_MAR
+        from src.engine.cross_line_visualizer import DAY_ORDER as CL_DAYS, DAY_COLS as CL_COLS, DAY_MARATHI as CL_MAR
+        from src.engine.cross_line_engine import DAY_NAMES as CLE_DAYS, DAY_COLS as CLE_COLS
+
+        for days in [FT_DAYS, FST_DAYS, CL_DAYS, CLE_DAYS]:
+            self.assertIn("Sun", days)
+            self.assertEqual(len(days), 7)
+
+        for cols in [FT_COLS, FST_COLS, CL_COLS, CLE_COLS]:
+            self.assertEqual(cols["Sun"], 6)
+
+        for mar in [FT_MAR, FST_MAR]:
+            self.assertEqual(mar["Sun"], "रविवार")
+
+    def test_week_transition_and_past_row_integrity(self):
+        """
+        Verify that when target_day is already declared in current row,
+        the engine advances to the new week (21/09/2026 to ...), and the
+        previous week (14/09/2026 to 19/09/2026) becomes a valid past row (< target_r).
+        """
+        from src.engine.family_triangle_engine import FamilyTriangleEngine
+        from src.engine.family_sequence_triangle_engine import FamilySequenceTriangleEngine
+
+        ft_eng = FamilyTriangleEngine()
+        # In Kalyan, 14/09/2026 already has Mon = '00'
+        snip = ft_eng.get_snippet('KALYAN', rows_count=5, target_day='Mon')
+        self.assertGreaterEqual(len(snip), 2)
+        target_row = snip[-1]
+        past_week_row = snip[-2]
+
+        # The new week is appended as the target row
+        self.assertIn('21/09/2026', target_row['date_range'])
+        # The 14/09 row is strictly before the target row
+        self.assertIn('14/09/2026', past_week_row['date_range'])
+
+        # Check projected triangles: all base nodes must have r < target_r (i.e. strictly from past weeks)
+        res = ft_eng.find_all_triangles(snip, target_day='Mon')
+        target_r = len(snip) - 1
+        for t in res['projected']:
+            node_A, node_B, target_node = t['nodes']
+            self.assertLess(node_A['r'], target_r)
+            self.assertLess(node_B['r'], target_r)
+            self.assertEqual(target_node['r'], target_r)
+            self.assertEqual(target_node['jodi'], '??')
+
+        # Check sequence engine
+        fst_eng = FamilySequenceTriangleEngine()
+        fst_snip = fst_eng.get_snippet('KALYAN', rows_count=5, target_day='Mon')
+        fst_res = fst_eng.find_all_sequence_triangles(fst_snip, target_day='Mon')
+        for t in fst_res['projected']:
+            node_A, node_B, target_node = t['nodes']
+            self.assertLess(node_A['r'], target_r)
+            self.assertLess(node_B['r'], target_r)
+            self.assertEqual(target_node['r'], target_r)
+
+    def test_supreme_markets_with_sunday(self):
+        """Verify Supreme Day and Supreme Night support Sunday records"""
+        from src.storage.database import MatkaDatabase
+        from src.engine.cross_line_engine import CrossLineEngine
+        db = MatkaDatabase()
+        df_sd = db.get_market_results('SUPREME DAY', limit=20)
+        self.assertFalse(df_sd.empty)
+        # Check that Sunday is present in records
+        days = df_sd['day_of_week'].unique()
+        self.assertIn('Sun', days)
+
+        cl_eng = CrossLineEngine(db)
+        grid = cl_eng.get_grid('SUPREME DAY', max_weeks=10)
+        self.assertGreater(len(grid), 0)
+
 if __name__ == '__main__':
     unittest.main()
+
 

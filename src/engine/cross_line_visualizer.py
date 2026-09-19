@@ -9,8 +9,9 @@ Renders side-by-side or stacked HTML panel chart snippets with SVG connecting ar
 from typing import Dict, Any, List, Optional
 from src.config import get_jodi_family, CUT_NUMBERS
 
-DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-DAY_COLS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5}
+DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+DAY_COLS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
+DAY_MARATHI = {"Mon": "सोम", "Tue": "मंगळ", "Wed": "बुध", "Thu": "गुरु", "Fri": "शुक्र", "Sat": "शनि", "Sun": "रवि"}
 
 RED_JODIS = {
     "00", "11", "22", "33", "44", "55", "66", "77", "88", "99",
@@ -136,7 +137,7 @@ def render_cross_line_panel_html(
     thead = f"""<thead>
         <tr style="background:#201030;color:#ddd;font-size:11px;height:{HEADER_H}px;">
             <th style="border:1px solid #444;width:{DATE_W}px;text-align:center;">Date Range</th>
-            {''.join([f'<th style="border:1px solid #444;width:{CELL_W}px;text-align:center;">{d}</th>' for d in days_to_show])}
+            {''.join([f'<th style="border:1px solid #444;width:{CELL_W}px;text-align:center;color:#00d2ff;">{DAY_MARATHI.get(d, d)}<br><span style="color:#888;font-size:9px;">{d}</span></th>' for d in days_to_show])}
         </tr>
     </thead>"""
 
@@ -154,7 +155,7 @@ def render_cross_line_panel_html(
         day_tds = ""
         for d in days_to_show:
             cell = w.get("days", {}).get(d, {})
-            jodi = cell.get("jodi", "**")
+            jodi = cell.get("jodi", "")
             is_red = jodi in RED_JODIS
 
             node_info = high_map.get((dr, d))
@@ -169,8 +170,11 @@ def render_cross_line_panel_html(
                     border_c = line_color if m_type == "EXACT" else "#ffcc00"
                     jodi_html = f'<div style="font-size:15px;font-weight:bold;color:#fff;border:2.5px solid {border_c};border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin:auto;box-shadow:0 0 8px {border_c};">{jodi}</div>'
             else:
-                color = "#ff3344" if is_red else "#888"
-                jodi_html = f'<div style="font-size:14px;color:{color};font-weight:600;">{jodi}</div>'
+                if not jodi or jodi == "**":
+                    jodi_html = '<div style="font-size:13px;color:#444;">--</div>'
+                else:
+                    color = "#ff3344" if is_red else "#888"
+                    jodi_html = f'<div style="font-size:14px;color:{color};font-weight:600;">{jodi}</div>'
 
             bg = "#1a1a2e" if r_idx % 2 == 0 else "#141424"
             day_tds += f'<td style="border:1px solid #222;text-align:center;padding:1px;background:{bg};width:{CELL_W}px;height:{ROW_H}px;">{jodi_html}</td>'

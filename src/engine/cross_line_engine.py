@@ -12,12 +12,14 @@ Rule:
 """
 
 from typing import List, Dict, Any, Optional, Tuple
+import datetime
+import re
 from collections import defaultdict
 from src.config import get_jodi_family, CUT_NUMBERS
 from src.storage.database import MatkaDatabase
 
-DAY_COLS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5}
-DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+DAY_COLS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
+DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 RED_JODIS = {
     # Double digits
@@ -38,12 +40,57 @@ def are_family(j1: str, j2: str) -> bool:
         return False
     return j2 in get_jodi_family(j1)
 
+def compute_next_week_date_range(dr: str) -> str:
+    m = re.search(r"(\d{2})/(\d{2})/(\d{4}) to (\d{2})/(\d{2})/(\d{4})", dr)
+    if m:
+        s_d, s_m, s_y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        e_d, e_m, e_y = int(m.group(4)), int(m.group(5)), int(m.group(6))
+        start_dt = datetime.date(s_y, s_m, s_d) + datetime.timedelta(days=7)
+        span = (datetime.date(e_y, e_m, e_d) - datetime.date(s_y, s_m, s_d)).days
+        end_dt = start_dt + datetime.timedelta(days=span)
+        return f"{start_dt.strftime('%d/%m/%Y')} to {end_dt.strftime('%d/%m/%Y')}"
+    m1 = re.search(r"(\d{2})/(\d{2})/(\d{4})", dr)
+    if m1:
+        d, mth, y = int(m1.group(1)), int(m1.group(2)), int(m1.group(3))
+        start_dt = datetime.date(y, mth, d) + datetime.timedelta(days=7)
+        end_dt = start_dt + datetime.timedelta(days=6)
+        return f"{start_dt.strftime('%d/%m/%Y')} to {end_dt.strftime('%d/%m/%Y')}"
+    m2 = re.search(r"(\d{4})-(\d{2})-(\d{2}) [Tt]o (\d{4})-(\d{2})-(\d{2})", dr)
+    if m2:
+        s_y, s_m, s_d = int(m2.group(1)), int(m2.group(2)), int(m2.group(3))
+        e_y, e_m, e_d = int(m2.group(4)), int(m2.group(5)), int(m2.group(6))
+        start_dt = datetime.date(s_y, s_m, s_d) + datetime.timedelta(days=7)
+        span = (datetime.date(e_y, e_m, e_d) - datetime.date(s_y, s_m, s_d)).days
+        end_dt = start_dt + datetime.timedelta(days=span)
+        return f"{start_dt.strftime('%Y-%m-%d')} To {end_dt.strftime('%Y-%m-%d')}"
+    return "Next Week"
+
+def should_advance_to_next_week(last_row: Dict[str, Any], target_day: Optional[str] = None) -> bool:
+    if not last_row:
+        return False
+    # 1. Target day was already declared in the last row
+    if target_day and target_day in last_row.get("days", {}):
+        return True
+    # 2. Date range has ended in real time (e.g. from 21-09-2026 onwards)
+    dr = last_row.get("date_range", "")
+    m = re.search(r"(\d{2})/(\d{2})/(\d{4}) to (\d{2})/(\d{2})/(\d{4})", dr)
+    if m:
+        e_d, e_m, e_y = int(m.group(4)), int(m.group(5)), int(m.group(6))
+        if datetime.date.today() > datetime.date(e_y, e_m, e_d):
+            return True
+    m2 = re.search(r"(\d{4})-(\d{2})-(\d{2}) [Tt]o (\d{4})-(\d{2})-(\d{2})", dr)
+    if m2:
+        e_y, e_m, e_d = int(m2.group(4)), int(m2.group(5)), int(m2.group(6))
+        if datetime.date.today() > datetime.date(e_y, e_m, e_d):
+            return True
+    return False
+
 
 class CrossLineEngine:
     def __init__(self, db: Optional[MatkaDatabase] = None):
         self.db = db or MatkaDatabase()
 
-    def get_grid(self, market: str, max_weeks: int = 300) -> List[Dict[str, Any]]:
+    def get_grid(self, market: str, max_weeks: int = 300, target_day: Optional[str] = None) -> List[Dict[str, Any]]:
         """Returns chronological weekly grid [W0, W1, ... W_latest]"""
         df = self.db.get_market_results(market, limit=max_weeks * 7)
         if df.empty:
@@ -61,10 +108,16 @@ class CrossLineEngine:
                     "is_red": int(r["is_red_jodi"]),
                 }
             grid.append(row)
+
+        # If target_day is already declared or current week has ended, advance to upcoming week
+        if grid and should_advance_to_next_week(grid[-1], target_day):
+            next_dr = compute_next_week_date_range(grid[-1]["date_range"])
+            grid.append({"date_range": next_dr, "days": {}, "grid_row": len(grid)})
+
         return grid
 
     def get_cell_jodi(self, grid: List[Dict[str, Any]], r: int, c: int) -> Optional[str]:
-        if r < 0 or r >= len(grid) or c < 0 or c >= 6:
+        if r < 0 or r >= len(grid) or c < 0 or c >= len(DAY_NAMES):
             return None
         day = DAY_NAMES[c]
         cell = grid[r].get("days", {}).get(day, {})
@@ -91,7 +144,7 @@ class CrossLineEngine:
         - Vertical Column     (dr=+1, dc=0)
         - Step-2 Cross        (dr=+2, dc=+1) / (dr=+2, dc=-1)
         """
-        grid = self.get_grid(market)
+        grid = self.get_grid(market, target_day=target_day)
         n = len(grid)
         if n < min_length + 2:
             return []
@@ -151,12 +204,12 @@ class CrossLineEngine:
                 # for any historical line of length k+1 that matches current_seq on first k elements
                 search_max_row = target_row - k - 1
                 for hr0 in range(search_max_row):
-                    for hc0 in range(6):
+                    for hc0 in range(len(DAY_NAMES)):
                         for h_dir_name, hdr, hdc in historical_directions:
                             # Check if historical line of length k+1 fits in grid
                             end_hr = hr0 + k * hdr
                             end_hc = hc0 + k * hdc
-                            if end_hr < 0 or end_hr >= search_max_row + 2 or end_hc < 0 or end_hc >= 6:
+                            if end_hr < 0 or end_hr >= search_max_row + 2 or end_hc < 0 or end_hc >= len(DAY_NAMES):
                                 continue
 
                             # Check match for first k elements

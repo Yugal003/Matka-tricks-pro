@@ -211,9 +211,17 @@ selected_market = st.sidebar.radio(
 st.sidebar.markdown("---")
 target_day = st.sidebar.selectbox(
     "🎯 टार्गेट दिवस (Target Day):",
-    ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     index=0,
-    format_func=lambda d: {"Mon":"सोमवार (Mon)","Tue":"मंगळवार (Tue)","Wed":"बुधवार (Wed)","Thu":"गुरुवार (Thu)","Fri":"शुक्रवार (Fri)","Sat":"शनिवार (Sat)"}[d]
+    format_func=lambda d: {
+        "Mon": "सोमवार (Mon)",
+        "Tue": "मंगळवार (Tue)",
+        "Wed": "बुधवार (Wed)",
+        "Thu": "गुरुवार (Thu)",
+        "Fri": "शुक्रवार (Fri)",
+        "Sat": "शनिवार (Sat)",
+        "Sun": "रविवार (Sun)"
+    }[d]
 )
 
 min_touch = st.sidebar.slider("किमान टच लाईन (Min Touch Length):", 2, 5, 3)
@@ -268,7 +276,7 @@ with tab_cross:
         # ── Visual Graphical Panels with SVG Arrows ──
         st.markdown("#### 📐 व्हिज्युअल क्रॉस लाईन चार्ट्स (Visual Panel Charts with Arrows):")
         
-        full_grid = cross_engine.get_grid(selected_market, max_weeks=350)
+        full_grid = cross_engine.get_grid(selected_market, max_weeks=350, target_day=target_day)
 
         # ── Active Current Line Overview Banner ──
         st.markdown(f"#### 🔵 चालू लाईन (Active Current Line — {target_day}):")
@@ -802,7 +810,7 @@ with tab_triangle:
     @st.cache_data(ttl=300, show_spinner=False)
     def load_triangle_data(mkt, rows, t_day):
         eng = FamilyTriangleEngine()
-        snip = eng.get_snippet(mkt, rows_count=rows)
+        snip = eng.get_snippet(mkt, rows_count=rows, target_day=t_day)
         data = eng.find_all_triangles(snip, target_day=t_day)
         return snip, data
 
@@ -1008,7 +1016,7 @@ with tab_seq_triangle:
     @st.cache_data(ttl=300, show_spinner=False)
     def load_seq_triangle_data(mkt, rows, t_day):
         eng = FamilySequenceTriangleEngine()
-        snip = eng.get_snippet(mkt, rows_count=rows)
+        snip = eng.get_snippet(mkt, rows_count=rows, target_day=t_day)
         data = eng.find_all_sequence_triangles(snip, target_day=t_day)
         return snip, data
 

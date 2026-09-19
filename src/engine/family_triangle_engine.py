@@ -10,12 +10,59 @@ Discovers geometric Family Triangles in the latest 4-6 rows of Matka charts:
 
 from typing import List, Dict, Any, Optional, Tuple
 import math
+import datetime
+import re
 from src.config import get_jodi_family, CUT_NUMBERS
 from src.storage.database import MatkaDatabase
 
-DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 DAY_COLS = {d: i for i, d in enumerate(DAY_ORDER)}
-DAY_MARATHI = {"Mon": "सोमवार", "Tue": "मंगळवार", "Wed": "बुधवार", "Thu": "गुरुवार", "Fri": "शुक्रवार", "Sat": "शनिवार"}
+DAY_MARATHI = {"Mon": "सोमवार", "Tue": "मंगळवार", "Wed": "बुधवार", "Thu": "गुरुवार", "Fri": "शुक्रवार", "Sat": "शनिवार", "Sun": "रविवार"}
+
+def compute_next_week_date_range(dr: str) -> str:
+    m = re.search(r"(\d{2})/(\d{2})/(\d{4}) to (\d{2})/(\d{2})/(\d{4})", dr)
+    if m:
+        s_d, s_m, s_y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        e_d, e_m, e_y = int(m.group(4)), int(m.group(5)), int(m.group(6))
+        start_dt = datetime.date(s_y, s_m, s_d) + datetime.timedelta(days=7)
+        span = (datetime.date(e_y, e_m, e_d) - datetime.date(s_y, s_m, s_d)).days
+        end_dt = start_dt + datetime.timedelta(days=span)
+        return f"{start_dt.strftime('%d/%m/%Y')} to {end_dt.strftime('%d/%m/%Y')}"
+    m1 = re.search(r"(\d{2})/(\d{2})/(\d{4})", dr)
+    if m1:
+        d, mth, y = int(m1.group(1)), int(m1.group(2)), int(m1.group(3))
+        start_dt = datetime.date(y, mth, d) + datetime.timedelta(days=7)
+        end_dt = start_dt + datetime.timedelta(days=6)
+        return f"{start_dt.strftime('%d/%m/%Y')} to {end_dt.strftime('%d/%m/%Y')}"
+    m2 = re.search(r"(\d{4})-(\d{2})-(\d{2}) [Tt]o (\d{4})-(\d{2})-(\d{2})", dr)
+    if m2:
+        s_y, s_m, s_d = int(m2.group(1)), int(m2.group(2)), int(m2.group(3))
+        e_y, e_m, e_d = int(m2.group(4)), int(m2.group(5)), int(m2.group(6))
+        start_dt = datetime.date(s_y, s_m, s_d) + datetime.timedelta(days=7)
+        span = (datetime.date(e_y, e_m, e_d) - datetime.date(s_y, s_m, s_d)).days
+        end_dt = start_dt + datetime.timedelta(days=span)
+        return f"{start_dt.strftime('%Y-%m-%d')} To {end_dt.strftime('%Y-%m-%d')}"
+    return "Next Week"
+
+def should_advance_to_next_week(last_row: Dict[str, Any], target_day: Optional[str] = None) -> bool:
+    if not last_row:
+        return False
+    # 1. Target day was already declared in the last row
+    if target_day and target_day in last_row.get("days", {}):
+        return True
+    # 2. Date range has ended in real time (e.g. from 21-09-2026 onwards)
+    dr = last_row.get("date_range", "")
+    m = re.search(r"(\d{2})/(\d{2})/(\d{4}) to (\d{2})/(\d{2})/(\d{4})", dr)
+    if m:
+        e_d, e_m, e_y = int(m.group(4)), int(m.group(5)), int(m.group(6))
+        if datetime.date.today() > datetime.date(e_y, e_m, e_d):
+            return True
+    m2 = re.search(r"(\d{4})-(\d{2})-(\d{2}) [Tt]o (\d{4})-(\d{2})-(\d{2})", dr)
+    if m2:
+        e_y, e_m, e_d = int(m2.group(4)), int(m2.group(5)), int(m2.group(6))
+        if datetime.date.today() > datetime.date(e_y, e_m, e_d):
+            return True
+    return False
 
 RED_JODIS = {
     "00", "11", "22", "33", "44", "55", "66", "77", "88", "99",
@@ -39,7 +86,7 @@ class FamilyTriangleEngine:
     def __init__(self, db: Optional[MatkaDatabase] = None):
         self.db = db or MatkaDatabase()
 
-    def get_snippet(self, market: str, rows_count: int = 5) -> List[Dict[str, Any]]:
+    def get_snippet(self, market: str, rows_count: int = 5, target_day: Optional[str] = None) -> List[Dict[str, Any]]:
         """Returns the latest rows_count weeks of a market."""
         df = self.db.get_market_results(market, limit=rows_count * 7 * 2)
         if df.empty:
@@ -56,6 +103,12 @@ class FamilyTriangleEngine:
                     "is_red": int(r["is_red_jodi"]),
                 }
             grid.append(row)
+
+        # If target_day is already declared or current week has ended, advance to upcoming week
+        if grid and should_advance_to_next_week(grid[-1], target_day):
+            next_dr = compute_next_week_date_range(grid[-1]["date_range"])
+            grid.append({"date_range": next_dr, "days": {}})
+
         return grid[-rows_count:] if len(grid) >= rows_count else grid
 
     def find_all_triangles(
@@ -254,7 +307,7 @@ def render_family_triangle_panel_html(
     thead = f"""<thead>
         <tr style="background:#201030;color:#ddd;font-size:12px;height:{HEADER_H}px;">
             <th style="border:1px solid #444;width:{DATE_W}px;text-align:center;box-sizing:border-box;padding:2px 0;height:{HEADER_H}px;line-height:1.1;">Date Range</th>
-            {''.join([f'<th style="border:1px solid #444;width:{CELL_W}px;text-align:center;box-sizing:border-box;padding:2px 0;height:{HEADER_H}px;line-height:1.1;">{d}</th>' for d in DAY_ORDER])}
+            {''.join([f'<th style="border:1px solid #444;width:{CELL_W}px;text-align:center;color:#ffcc00;box-sizing:border-box;padding:2px 0;height:{HEADER_H}px;line-height:1.1;">{DAY_MARATHI[d]}<br><span style="color:#888;font-size:10px;">{d}</span></th>' for d in DAY_ORDER])}
         </tr>
     </thead>"""
 
@@ -274,7 +327,7 @@ def render_family_triangle_panel_html(
         day_tds = ""
         for c_idx, d in enumerate(DAY_ORDER):
             cell = w.get("days", {}).get(d, {})
-            jodi = cell.get("jodi", "**")
+            jodi = cell.get("jodi", "")
             is_red = jodi in RED_JODIS
 
             node_info = high_map.get((r_idx, c_idx))
@@ -285,10 +338,13 @@ def render_family_triangle_panel_html(
                     jodi_html = f'<div style="font-size:16px;font-weight:900;color:#fff;background:#ff007f;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;margin:auto;box-shadow:0 0 14px #ff007f;" title="टार्गेट त्रिकोण टोक">??</div>'
                 else:
                     # Highlighted Vertex
-                    jodi_html = f'<div style="font-size:15px;font-weight:900;color:#fff;background:#181830;border:3px solid {pal["stroke"]};border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;margin:auto;box-shadow:0 0 10px {pal["glow"]};">{jodi}</div>'
+                    jodi_html = f'<div style="font-size:15px;font-weight:900;color:#fff;background:#181830;border:3px solid {pal["stroke"]};border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;margin:auto;box-shadow:0 0 10px {pal["glow"]};">{jodi or "??"}</div>'
             else:
-                color = "#ff3344" if is_red else "#888"
-                jodi_html = f'<div style="font-size:14px;color:{color};font-weight:600;">{jodi}</div>'
+                if not jodi:
+                    jodi_html = '<div style="font-size:13px;color:#444;">--</div>'
+                else:
+                    color = "#ff3344" if is_red else "#888"
+                    jodi_html = f'<div style="font-size:14px;color:{color};font-weight:600;">{jodi}</div>'
 
             bg = "#1a1a2e" if r_idx % 2 == 0 else "#141424"
             day_tds += f'<td style="border:1px solid #222;text-align:center;padding:0;background:{bg};width:{CELL_W}px;height:{ROW_H}px;box-sizing:border-box;">{jodi_html}</td>'
