@@ -175,15 +175,20 @@ class FamilyTriangleEngine:
                         elif A["c"] == B["c"] or B["c"] == C["c"] or A["c"] == C["c"]:
                             t_type = "काटकोन त्रिकोण (Right-Angle Triangle)"
                         
+                        col_span = max(A["c"], B["c"], C["c"]) - min(A["c"], B["c"], C["c"])
                         completed.append({
                             "type_title": t_type,
                             "nodes": [A, B, C],
                             "jodis": [A["jodi"], B["jodi"], C["jodi"]],
                             "family": sorted(list(fam_A)),
                             "row_span": row_span,
+                            "col_span": col_span,
                             "area": abs(area2) / 2.0,
                             "summary": f"{A['day']}({A['jodi']}) ➔ {B['day']}({B['jodi']}) ➔ {C['day']}({C['jodi']})"
                         })
+
+        # Sort: smallest col_span first (tight/adjacent day triangles before wide ones)
+        completed.sort(key=lambda t: (t["col_span"], t["row_span"]))
 
         # 2. Projected Triangles (2 past nodes pointing to Target Cell on the latest week)
         # Base vertices A and B come ONLY from past completed rows (r < target_r).
@@ -228,6 +233,7 @@ class FamilyTriangleEngine:
                     elif abs(dist_A_T - dist_B_T) < 0.2:
                         p_type = "🔺 समद्विभुज टार्गेट (Symmetric to Target)"
 
+                    col_span_p = max(A["c"], B["c"], target_c) - min(A["c"], B["c"], target_c)
                     projected.append({
                         "type_title": p_type,
                         "nodes": [A, B, target_node],
@@ -235,9 +241,13 @@ class FamilyTriangleEngine:
                         "predicted_family": sorted(list(set(A["family"]))),
                         "target_node": target_node,
                         "row_span": r_span,
+                        "col_span": col_span_p,
                         "area": abs(area2) / 2.0,
                         "summary": f"{A['day']}({A['jodi']}) + {B['day']}({B['jodi']}) ➔ {target_day}(??)"
                     })
+
+        # Sort: smallest col_span first (tight/adjacent day triangles before wide ones)
+        projected.sort(key=lambda t: (t["col_span"], t["row_span"]))
 
         return {
             "completed": completed,
