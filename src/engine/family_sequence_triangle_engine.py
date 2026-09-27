@@ -63,6 +63,11 @@ def should_advance_to_next_week(last_row: Dict[str, Any], target_day: Optional[s
             return True
     return False
 
+def circular_day_dist(a: int, b: int, n: int = 7) -> int:
+    """Circular calendar distance between two day-column indices (0=Mon … 6=Sun)."""
+    diff = abs(a - b)
+    return min(diff, n - diff)
+
 TRIANGLE_PALETTES = [
     {"stroke": "#00d2ff", "fill": "rgba(0, 210, 255, 0.18)", "glow": "rgba(0, 210, 255, 0.6)"},
     {"stroke": "#ff007f", "fill": "rgba(255, 0, 127, 0.18)", "glow": "rgba(255, 0, 127, 0.6)"},
@@ -218,6 +223,9 @@ class FamilySequenceTriangleEngine:
                         row_span = max_r - min_r + 1
 
                         col_span = max(A["c"], B["c"], C["c"]) - min(A["c"], B["c"], C["c"])
+                        circ_spread = (circular_day_dist(A["c"], B["c"]) +
+                                       circular_day_dist(B["c"], C["c"]) +
+                                       circular_day_dist(A["c"], C["c"]))
                         completed.append({
                             "type_title": f"⚡ फॅमिली सीक्वेन्स त्रिकोण ({matched_seq['type_desc']})",
                             "sequence_desc": f"{matched_seq['aligned_A']} ➔ {matched_seq['aligned_B']} ➔ {C['jodi']}",
@@ -228,12 +236,14 @@ class FamilySequenceTriangleEngine:
                             "family_C": sorted(list(set(C["family"]))),
                             "row_span": row_span,
                             "col_span": col_span,
+                            "circ_spread": circ_spread,
                             "area": abs(area2) / 2.0,
                             "summary": f"{A['day']}({A['jodi']}) ➔ {B['day']}({B['jodi']}) ➔ {C['day']}({C['jodi']})"
                         })
 
-        # Sort: smallest col_span first (tight/adjacent day triangles before wide ones)
-        completed.sort(key=lambda t: (t["col_span"], t["row_span"]))
+        # Sort: tightest circular spread first (Sun-Tue-Thu before Mon-Fri-Sat)
+        completed.sort(key=lambda t: (t["circ_spread"], t["row_span"]))
+
 
         # 2. Projected Triangles (Node A and Node B point to target ??)
         # Nodes A and B come ONLY from past completed rows (r < target_r).
@@ -268,6 +278,8 @@ class FamilySequenceTriangleEngine:
                 row_span = max_r - min_r + 1
 
                 col_span_p = max(A["c"], B["c"], target_c) - min(A["c"], B["c"], target_c)
+                circ_to_target = (circular_day_dist(A["c"], target_c) +
+                                  circular_day_dist(B["c"], target_c))
                 projected.append({
                     "type_title": f"🎯 टार्गेट फॅमिली सीक्वेन्स ({best_seq['type_desc']})",
                     "sequence_formula": f"{best_seq['aligned_A']} (Family {A['jodi']}) ➔ {best_seq['aligned_B']} (Family {B['jodi']}) ➔ {best_seq['fwd_target_jodi']} / {best_seq['bwd_target_jodi']}",
@@ -282,12 +294,13 @@ class FamilySequenceTriangleEngine:
                     "target_node": target_node,
                     "row_span": row_span,
                     "col_span": col_span_p,
+                    "circ_to_target": circ_to_target,
                     "area": abs(area2) / 2.0,
                     "summary": f"{A['day']}({A['jodi']}) + {B['day']}({B['jodi']}) ➔ {target_day}(??)"
                 })
 
-        # Sort: smallest col_span first (tight/adjacent day triangles before wide ones)
-        projected.sort(key=lambda t: (t["col_span"], t["row_span"]))
+        # Sort: base nodes closest (circular) to target come first → Sun-Tue before Mon-Fri-Sat
+        projected.sort(key=lambda t: (t["circ_to_target"], t["row_span"]))
 
         return {
             "completed": completed,
